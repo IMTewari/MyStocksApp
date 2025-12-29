@@ -206,13 +206,17 @@ export default function Home() {
               <b>Headlines:</b>
               <ul>
                 {d.news.slice(0, 5).map((n) => (
-                  <li key={n.url}>
-                    [{n.sent > 0 ? "+" : n.sent < 0 ? "−" : "0"}]{" "}
-                    <a href={n.url} target="_blank" rel="noreferrer">
-                      {n.title}
-                    </a>{" "}
-                    <i>({n.source || "News"})</i>
-                  </li>
+                  
+<li key={n.url}>
+  {(() => {
+    const s = typeof n.sent === "number" ? n.sent : 0;
+    return `[${s > 0 ? "+" : s < 0 ? "−" : "0"}] `;
+  })()}
+  <a href={n.url} target="_blank" rel="noreferrer">
+    {n.title}
+  </a>{" "}
+  <i>({n.source || "News"})</i>
+</li>
                 ))}
               </ul>
             </div>
