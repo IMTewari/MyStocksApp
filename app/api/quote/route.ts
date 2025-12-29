@@ -1,5 +1,10 @@
+
+// app/api/quote/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import yahooFinance from "yahoo-finance2";
+
+// Ensure Node runtime for this route
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -8,7 +13,7 @@ export async function GET(req: NextRequest) {
   try {
     const quote = await yahooFinance.quote(symbol);
     return NextResponse.json(quote);
-  } catch (e:any) {
-    return NextResponse.json({ error: e?.message || 'fetch error' }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "fetch error" }, { status: 500 });
   }
 }
