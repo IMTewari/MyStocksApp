@@ -58,26 +58,62 @@ export default function Home(){
   const [data,setData]=useState<any[]>([]);
   const [loading,setLoading]=useState(false);
 
-  async function run(){
-    setLoading(true);
+  
+async function run() {
+  setLoading(true);
+  setData([]);
+  try {
     const symbols = parseSimple(portfolioText);
-    const out:any[]=[];
-    for(const sym of symbols){
-      const q = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`).then(r=>r.json());
-      const h = await fetch(`/api/history?symbol=${encodeURIComponent(sym)}`).then(r=>r.json());
-      const closes = h.map((x:any)=>x.close);
-      const s50 = sma(closes,50), s200=sma(closes,200), rsi = rsi14(closes);
-      const candles = h.map((x:any)=>({date:x.date,open:x.open,high:x.high,low:x.low,close:x.close,volume:x.volume}));
-      const atr = atr14(candles);
-      const rec = recStop(q.regularMarketPrice, s50, s200, atr, {trailPct, atrMult});
-      const stopHit = q.regularMarketPrice <= rec;
-      const name = q?.longName || sym.replace(/\.NS|\.BO/, '');
-      const news = await fetch(`/api/news?q=${encodeURIComponent(sym)}&name=${encodeURIComponent(name)}`).then(r=>r.json());
-      out.push({ symbol:sym, price:q.regularMarketPrice, currency:q.currency,
-        s50, s200, rsi, atr, recStop:rec, stopHit, news });
+    // Fetch each symbol sequentially but safely (or use Promise.allSettled for speed)
+    const out: any[] = [];
+    for (const sym of symbols) {
+      try {
+        const q = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`).then(r => r.json());
+        // If quote failed, skip this symbol gracefully
+        if (!q || q.error) { console.warn("quote failed", sym, q?.error); continue; }
+
+        const h = await fetch(`/api/history?symbol=${encodeURIComponent(sym)}`).then(r => r.json());
+        if (!h || !Array.isArray(h) || h.length === 0) { console.warn("history empty", sym); continue; }
+
+        const closes = h.map((x: any) => x.close);
+        const s50 = sma(closes, 50), s200 = sma(closes, 200), rsi = rsi14(closes);
+        const atr = (function(c: any[]) {
+          // compute ATR from history output
+          if (c.length < 15) return Number.NaN;
+          const tr: number[] = [];
+          for (let i = 1; i < c.length; i++) {
+            const prev = c[i - 1], cur = c[i];
+            const ranges = [cur.high - cur.low, Math.abs(cur.high - prev.close), Math.abs(cur.low - prev.close)];
+            tr.push(Math.max(...ranges));
+          }
+          const n = 14; let s = tr.slice(0, n).reduce((a, b) => a + b, 0) / n;
+          for (let i = n; i < tr.length; i++) s = (s * (n - 1) + tr[i]) / n;
+          return s;
+        })(h);
+
+        const rec = recStop(q.regularMarketPrice, s50, s200, atr, { trailPct, atrMult });
+        const stopHit = q.regularMarketPrice <= rec;
+        const name = q?.longName || sym.replace(/\.NS|\.BO/, "");
+        let news: any[] = [];
+        try {
+          news = await fetch(`/api/news?q=${encodeURIComponent(sym)}&name=${encodeURIComponent(name)}`).then(r => r.json());
+        } catch (e) {
+          console.warn("news failed", sym, e);
+        }
+        out.push({ symbol: sym, price: q.regularMarketPrice, currency: q.currency, s50, s200, rsi, atr, recStop: rec, stopHit, news });
+      } catch (err) {
+        console.warn("symbol failed", sym, err);
+        // continue processing other symbols
+      }
     }
-    setData(out); setLoading(false);
+    setData(out);
+  } catch (err) {
+    console.error("run() failed", err);
+  } finally {
+    setLoading(false);
   }
+}
+
 
   const rowsUI = useMemo(()=>data.map(d=>(
     <div key={d.symbol} className="card">
