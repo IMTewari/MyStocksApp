@@ -1,5 +1,6 @@
 
 "use client";
+import { CoachSummary } from "./Coach";
 import { useEffect, useMemo, useState } from "react";
 import { computeSignals } from "@/lib/signals";
 
@@ -93,6 +94,9 @@ export default function Dashboard() {
 
   return (
     <main>
+      
+<h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>Portfolio Coach</h1>
+    <CoachSummary rows={rows} flags={flags} tips={tips} />
       <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>Portfolio Coach</h1>
       <div style={{ marginBottom: 16, color: '#666' }}>Valuation: ₹{valuation.toLocaleString()}</div>
       {error && <div style={{ color: 'crimson', marginBottom: 12 }}>{error}</div>}
