@@ -1,30 +1,32 @@
 
-# India Portfolio Coach — Web (Next.js)
+# My Stocks App – Portfolio Coach (Zerodha)
 
-Paste your NSE/BSE tickers and get a live dashboard with prices, ATR/RSI, AI‑inspired stop suggestions, and headlines from BSE + Bing + Google News RSS.
+A minimal Next.js App Router app that connects to Zerodha (Kite Connect) to show your holdings, valuation, red flags and tips, with realtime LTP via a simple polling fallback. You can deploy to Vercel and drop these files into GitHub.
 
-> Data via `yahoo-finance2` (unofficial; personal/research use per Yahoo terms). News via Bing News API (server) and Google News RSS; BSE corporate announcements filtered via `site:bseindia.com` RSS.> Yahoo Finance usage notes: [npm docs](https://www.npmjs.com/package/yahoo-finance2). Bing News docs: Microsoft Learn. Google News RSS query format reference. BSE RSS hub for corporate announcements.  
+## 1) Environment variables (Vercel)
+Add these in **Vercel → Project → Settings → Environment Variables**:
 
-## One‑Click Deploy
+- `KITE_API_KEY` – your Zerodha developer API key (client id)
+- `KITE_API_SECRET` – your Zerodha API secret (**Sensitive**)
+- `NEXT_PUBLIC_APP_URL` – your deployed URL, e.g. `https://YOUR-APP.vercel.app`
+- `CRON_SECRET` – a random 16+ char string (for cron route)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=REPO_URL_PLACEHOLDER&env=BING_NEWS_KEY&project-name=india-portfolio-coach-ui&repository-name=india-portfolio-coach-ui)
+## 2) Zerodha Developer Console
+Set your Redirect URL to:
+```
+https://YOUR-APP.vercel.app/api/kite/callback
+```
 
-**Before clicking:** replace `REPO_URL_PLACEHOLDER` with your GitHub repo URL (e.g., `https://github.com/yourname/india-portfolio-coach-ui`).
-
-### Env Vars
-- `BING_NEWS_KEY` — Azure Bing News Search API key.
-
-## Local Dev
+## 3) Install & run locally
 ```bash
 npm i
 npm run dev
-# open http://localhost:3000
 ```
 
-## Notes
-- **Tickers**: Use `.NS` for NSE and `.BO` for BSE (e.g., `RELAXO.NS`, `TCS.NS`).
-- **CORS**: RSS is fetched server‑side (API routes) to avoid browser CORS blocks on cross‑origin feeds.
-- **Stops**: Recommended stop = max( trailing%, ATR×mult, MA‑support ); tightened automatically in downtrends.
+## 4) Login flow
+Visit `/api/kite/login` to authenticate. On success you land on `/dashboard` with data.
 
-## License
-MIT (app code). Third‑party data providers’ terms apply.
+## 5) Notes
+- Historical OHLC + realtime WebSocket data require Zerodha **Connect** plan.
+- This app currently uses a **snapshot LTP polling** endpoint every 5s for simplicity. You can later switch to WebSocket using `/api/kite/ws`.
+- `vercel.json` contains an optional pre-market cron job stub.

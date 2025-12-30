@@ -1,0 +1,9 @@
+
+import { NextRequest, NextResponse } from "next/server";
+
+export async function GET(req: NextRequest) {
+  const access = req.cookies.get("kite_access_token")?.value;
+  if (!access) return NextResponse.json({ error: "not_authenticated" }, { status: 401 });
+  const wsUrl = `wss://ws.kite.trade?api_key=${process.env.KITE_API_KEY!}&access_token=${access}`;
+  return NextResponse.json({ wsUrl });
+}
