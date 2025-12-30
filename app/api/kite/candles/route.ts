@@ -1,7 +1,8 @@
 
-// app/api/kite/candles/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { KiteConnect } from "kiteconnect";
+
+export const runtime = 'nodejs';
 
 type Interval =
   | "day"
@@ -49,8 +50,8 @@ export async function GET(req: NextRequest) {
   const kc = new KiteConnect({ api_key: process.env.KITE_API_KEY! });
   kc.setAccessToken(access);
 
-  // When the TS client is stricter, make sure the arg order matches the SDK you installed.
-  const data = await kc.getHistoricalData(instrumentToken, from, to, interval);
+  // Correct order expected by kiteconnectjs: token, interval, from, to
+  const data = await kc.getHistoricalData(instrumentToken, interval, from, to);
   const candles = data.map((d: any) => ({
     c: d.close,
     h: d.high,
@@ -60,4 +61,3 @@ export async function GET(req: NextRequest) {
   }));
   return NextResponse.json({ candles });
 }
-``
