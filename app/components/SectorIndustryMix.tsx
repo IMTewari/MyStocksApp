@@ -2,11 +2,14 @@
 "use client";
 
 import * as React from "react";
-import { SectorIndustryMix, MixSlice } from "@/app/lib/portfolio/types";
+import type {
+  SectorIndustryMix as SectorIndustryMixType,
+  MixSlice,
+} from "@/app/lib/portfolio/types";
 
 type Props = {
-  mix: SectorIndustryMix;
-  concentrationThreshold?: number; // e.g., 35 (%)
+  mix: SectorIndustryMixType;
+  concentrationThreshold?: number;
   className?: string;
 };
 
@@ -42,7 +45,10 @@ export default function SectorIndustryMix({
         {slices.map((s) => {
           const risky = s.pct > Number(concentrationThreshold);
           return (
-            <div key={s.label} className="grid grid-cols-[minmax(160px,240px)_1fr_minmax(160px,200px)] items-center gap-4">
+            <div
+              key={s.label}
+              className="grid grid-cols-[minmax(160px,240px)_1fr_minmax(160px,200px)] items-center gap-4"
+            >
               {/* Label + swatch */}
               <div className="flex items-center gap-2">
                 <span
