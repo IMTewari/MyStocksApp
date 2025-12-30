@@ -1,0 +1,6 @@
+
+// Add after CoachSummary import:
+import { SectorMix } from "./SectorMix";
+
+// Then render below <CoachSummary ... />
+<SectorMix rows={rows.map(r => ({ tradingsymbol: r.tradingsymbol, exchange: r.exchange, quantity: r.quantity, last_price: r.last_price }))} />
