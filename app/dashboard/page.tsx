@@ -1,9 +1,10 @@
-import { enforceDataContract } from "@/app/lib/portfolio/dataGuard";
+
 
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { computeSignals } from "@/lib/signals";
 import { CoachSummary } from "./Coach";
+import { enforceDataContract } from "@/app/lib/portfolio/dataGuard";
 
 type HoldingRow = {
   instrument_token: number;
