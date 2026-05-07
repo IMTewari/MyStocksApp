@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {State } from "react";
 import { computeSignals } from "@/lib/signals";
 import { CoachSummary } from "./Coach";
 
 import ScriptDecisionCard from "@/app/components/ScriptDecisionCard";
 import { buildInsight } from "@/app/lib/decision/buildInsight";
 import { ContextualEvidence } from "@/app/lib/decision/contextualEvidence";
+import { unknown } from "@/app/lib/decision/evidence";
+
+/* ===============================
+   Types
+   =============================== */
 
 type HoldingRow = {
   instrument_token: number;
@@ -19,6 +24,10 @@ type HoldingRow = {
 
 type Candle = { c: number };
 
+/* ===============================
+   Component
+   =============================== */
+
 export default function Dashboard() {
   const [rows, setRows] = useState<HoldingRow[]>([]);
   const [tips, setTips] = useState<Record<string, any>>({});
@@ -28,13 +37,12 @@ export default function Dashboard() {
   const [candlesBySymbol, setCandlesBySymbol] = useState<
     Record<string, Candle[]>
   >({});
-
   const [indexCandles, setIndexCandles] = useState<number[]>([]);
   const [insights, setInsights] = useState<any[]>([]);
 
-  /* ===============================
+  /* -------------------------------
      Load Portfolio
-     =============================== */
+     ------------------------------- */
   useEffect(() => {
     (async () => {
       try {
@@ -66,13 +74,13 @@ export default function Dashboard() {
     })();
   }, []);
 
-  /* ===============================
-     Fetch Index Candles (Benchmark)
-     =============================== */
+  /* -------------------------------
+     Fetch Benchmark (Index) Candles
+     ------------------------------- */
   useEffect(() => {
     (async () => {
       try {
-        // Example: NIFTY 50
+        // Example benchmark: NIFTY 50
         const url =
           "/api/data/ohlc?symbol=NIFTY%2050&exchange=NSE&days=365";
         const res = await fetch(url);
@@ -86,9 +94,9 @@ export default function Dashboard() {
     })();
   }, []);
 
-  /* ===============================
+  /* -------------------------------
      Fetch OHLC Candles for Holdings
-     =============================== */
+     ------------------------------- */
   useEffect(() => {
     if (!rows.length) return;
 
@@ -114,9 +122,9 @@ export default function Dashboard() {
     })();
   }, [rows]);
 
-  /* ===============================
-     Existing Coach Logic (UNCHANGED)
-     =============================== */
+  /* -------------------------------
+     Existing Coach Signals (unchanged)
+     ------------------------------- */
   useEffect(() => {
     if (!rows.length) return;
 
@@ -133,9 +141,9 @@ export default function Dashboard() {
     setFlags(s.flags);
   }, [rows, candlesBySymbol]);
 
-  /* ===============================
-     Build AI / Decision Insights
-     =============================== */
+  /* -------------------------------
+     Build Decision Insights
+     ------------------------------- */
   useEffect(() => {
     if (!rows.length) return;
 
@@ -150,35 +158,19 @@ export default function Dashboard() {
           candles: stockCloses,
           indexCandles,
 
+          // Fundamentals: explicitly UNKNOWN (typed correctly)
           fundamental: {
-            pe: { status: "UNKNOWN", reason: "PE not wired" },
-            pe5yMedian: {
-              status: "UNKNOWN",
-              reason: "Historical PE not wired",
-            },
-            promoterHolding: {
-              status: "UNKNOWN",
-              reason: "Promoter data not wired",
-            },
-            promoterHolding3mAgo: {
-              status: "UNKNOWN",
-              reason: "Promoter history not wired",
-            },
+            pe: unknown<number>("PE not wired"),
+            pe5yMedian: unknown<number>("Historical PE not wired"),
+            promoterHolding: unknown<number>("Promoter data not wired"),
+            promoterHolding3mAgo: unknown<number>("Promoter history not wired"),
           },
 
+          // Market context: explicitly UNKNOWN (typed correctly)
           market: {
-            recentDrawdownPct: {
-              status: "UNKNOWN",
-              reason: "Drawdown not computed",
-            },
-            liquidityReturning: {
-              status: "UNKNOWN",
-              reason: "Liquidity regime not identified",
-            },
-            macroRiskHigh: {
-              status: "UNKNOWN",
-              reason: "Macro risk model not wired",
-            },
+            recentDrawdownPct: unknown<number>("Drawdown not computed"),
+            liquidityReturning: unknown<boolean>("Liquidity regime not identified"),
+            macroRiskHigh: unknown<boolean>("Macro risk model not wired"),
           },
 
           contextualEvidence: [] as ContextualEvidence[],
@@ -191,6 +183,9 @@ export default function Dashboard() {
     })();
   }, [rows, candlesBySymbol, indexCandles]);
 
+  /* -------------------------------
+     Valuation
+     ------------------------------- */
   const valuation = useMemo(
     () =>
       rows.reduce(
@@ -200,9 +195,9 @@ export default function Dashboard() {
     [rows]
   );
 
-  /* ===============================
+  /* -------------------------------
      Render
-     =============================== */
+     ------------------------------- */
   return (
     <main style={{ maxWidth: 1000, margin: "0 auto", padding: 16 }}>
       <h1 style={{ fontSize: 24, fontWeight: 600 }}>
