@@ -9,29 +9,30 @@ export type Evidence<T> =
 
 export function deriveTechnicalEvidence(
   closePrices: number[],
-  indexPrices: number[]     // ← NEW
+  indexPrices: number[]
 ) {
+  // Guard: insufficient history
   if (!closePrices || closePrices.length < 200) {
     return {
       below200dma: {
         status: "UNKNOWN",
-        reason: "Insufficient history",
-      } as Evidence<boolean>,
+        reason: "Less than 200 data points",
+      } as const satisfies Evidence<boolean>,
 
       momentumUp: {
         status: "UNKNOWN",
-        reason: "Insufficient history",
-      } as Evidence<boolean>,
+        reason: "Insufficient EMA data",
+      } as const satisfies Evidence<boolean>,
 
       rsiAbove50: {
         status: "UNKNOWN",
-        reason: "Insufficient history",
-      } as Evidence<boolean>,
+        reason: "Insufficient RSI data",
+      } as const satisfies Evidence<boolean>,
 
       relativeStrength: {
         status: "UNKNOWN",
-        reason: "Index comparison unavailable",
-      } as Evidence<number>,
+        reason: "Index prices unavailable",
+      } as const satisfies Evidence<number>,
     };
   }
 
@@ -48,28 +49,27 @@ export function deriveTechnicalEvidence(
     below200dma: {
       status: "KNOWN",
       value: closePrices.at(-1)! < ema200.at(-1)!,
-    } as Evidence<boolean>,
+    } as const satisfies Evidence<boolean>,
 
     momentumUp: {
       status: "KNOWN",
       value: ema20.at(-1)! > ema50.at(-1)!,
-    } as Evidence<boolean>,
+    } as const satisfies Evidence<boolean>,
 
     rsiAbove50: {
       status: "KNOWN",
       value: rsi14.at(-1)! > 50,
-    } as Evidence<boolean>,
+    } as const satisfies Evidence<boolean>,
 
     relativeStrength:
-      rs === null
-        ? {
+      rs == null
+        ? ({
             status: "UNKNOWN",
-            reason: "RS unavailable",
-          }
-        : {
+            reason: "Relative strength unavailable",
+          } as const satisfies Evidence<number>)
+        : ({
             status: "KNOWN",
             value: rs,
-          },
+          } as const satisfies Evidence<number>),
   };
 }
-``
