@@ -6,6 +6,8 @@ import { CoachSummary } from "./Coach";
 
 import ScriptDecisionCard from "@/app/components/ScriptDecisionCard";
 import { mockInsights } from "@/app/lib/decision/mockInsights";
+import { buildInsight } from "@/app/lib/decision/buildInsight";
+
 ``
 
 type HoldingRow = {
@@ -22,6 +24,7 @@ export default function Dashboard() {
   const [tips, setTips] = useState<Record<string, any>>({});
   const [flags, setFlags] = useState<Record<string, any>>({});
   const [error, setError] = useState<string | null>(null);
+  const [insights, setInsights] = useState<any[]>([]);
 
   /* ===============================
      Load portfolio
@@ -140,6 +143,41 @@ export default function Dashboard() {
     })();
   }, [rows]);
 
+  useEffect(() => {
+  if (!rows.length) return;
+
+  (async () => {
+    const out: any[] = [];
+
+    for (const r of rows) {
+      try {
+        // Map YOUR existing data to insight inputs
+        const insight = await buildInsight(r.tradingsymbol, {
+          technical: {
+            below200dma: flags[r.tradingsymbol]?.some(
+              (f: any) => f.type === "below_200dma"
+            ) ?? false,
+            momentumUp: true, // plug real momentum later
+          },
+          market: {
+            recentDrawdownPct: 15, // can compute
+            liquidityReturning: true,
+            macroRiskHigh: false,
+          },
+          sector: "General",
+          context: "recent market volatility and risk adjustment",
+        });
+
+        out.push(insight);
+      } catch (e) {
+        console.error("Insight build failed", r.tradingsymbol, e);
+      }
+    }
+
+    setInsights(out);
+  })();
+}, [rows, flags]);
+
   const valuation = useMemo(
     () =>
       rows.reduce(
@@ -251,14 +289,19 @@ export default function Dashboard() {
         AI Investment Decisions
       </h2>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {mockInsights.map(insight => (
-          <ScriptDecisionCard
-            key={insight.symbol}
-            insight={insight}
-          />
-        ))}
-      </div>
+      <h2 style={{ marginTop: 32 }}>
+  AI Investment Decisions
+</h2>
+
+<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+  {insights.map(insight => (
+    <ScriptDecisionCard
+      key={insight.symbol}
+      insight={insight}
+    />
+  ))}
+</div>
+``
     </main>
   );
 }
