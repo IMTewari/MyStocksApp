@@ -1,15 +1,10 @@
 // app/lib/decision/decisionEngine.ts
 
+import { BusinessArchetype } from "./businessArchetype";
 import { ContextualEvidence } from "./contextualEvidence";
 
-/**
- * Lens-level decisions (pure signal outputs)
- */
 export type LensDecision = "BUY" | "HOLD" | "SELL";
 
-/**
- * Final portfolio action (DO NOT NARROW)
- */
 export type FinalAction =
   | "BUY"
   | "HOLD"
@@ -17,103 +12,64 @@ export type FinalAction =
   | "EXIT"
   | "AVOID";
 
-/**
- * Standard output from any analytical lens
- */
 export interface LensOutcome {
   decision: LensDecision;
   reason: string;
   confidence: number; // 0–100
 }
 
-/**
- * Output shown per script in UI
- */
 export interface ScriptInsight {
   symbol: string;
+  archetype: BusinessArchetype;
 
   technical: LensOutcome;
   fundamental: LensOutcome;
   market: LensOutcome;
 
-  /**
-   * External, fact-based context
-   * (geopolitics, macro, commodities, policy)
-   */
   contextualEvidence: ContextualEvidence[];
-
-  /**
-   * AI narrative explanation (NO decision power)
-   */
   aiCommentary: string;
 
-  /**
-   * Aggregated portfolio action
-   */
   finalAction: FinalAction;
   finalConfidence: number;
   finalRationale: string;
 }
 
 /**
- * Aggregate multiple lenses into one portfolio decision.
- *
- * Rules:
- * - No assumptions
- * - Unknown / weak evidence penalizes confidence
- * - EXIT reserved for strong negative alignment
- * - AVOID used when information quality is too low
+ * Aggregate decisions WITH semantic awareness.
  */
 export function aggregateDecision(
   technical: LensOutcome,
   fundamental: LensOutcome,
-  market: LensOutcome
+  market: LensOutcome,
+  archetype: BusinessArchetype
 ): {
   action: FinalAction;
   confidence: number;
   rationale: string;
 } {
-  // Weighted confidence (fundamentals dominate by design)
-  const baseConfidence =
-    technical.confidence * 0.3 +
-    fundamental.confidence * 0.5 +
+  // Base weighted confidence
+  const base =
+    technical.confidence * 0.4 +
+    fundamental.confidence * 0.4 +
     market.confidence * 0.2;
 
-  // Penalize uncertainty explicitly
+  // Penalize uncertainty
   const uncertaintyPenalty =
-    [technical, fundamental, market].filter(
-      o => o.confidence < 40
-    ).length * 15;
+    [technical, fundamental, market].filter(x => x.confidence < 40).length * 15;
 
-  const confidence = Math.max(
-    0,
-    Math.round(baseConfidence - uncertaintyPenalty)
-  );
+  const confidence = Math.max(0, Math.round(base - uncertaintyPenalty));
 
-  // Strong aligned downside → EXIT
-  if (
-    technical.decision === "SELL" &&
-    fundamental.decision === "SELL"
-  ) {
+  // Structural EXIT
+  if (technical.decision === "SELL" && fundamental.decision === "SELL") {
     return {
       action: "EXIT",
       confidence,
       rationale:
-        "Technical and fundamental signals jointly indicate capital risk",
+        "Technical and fundamental weakness align for this business type",
     };
   }
 
-  // Structural downside → SELL
-  if (fundamental.decision === "SELL") {
-    return {
-      action: "SELL",
-      confidence,
-      rationale:
-        "Fundamental deterioration outweighs tactical considerations",
-    };
-  }
-
-  // Strong aligned upside → BUY
+  // Archetype‑aware BUY gating
   if (
     technical.decision === "BUY" &&
     fundamental.decision === "BUY"
@@ -122,25 +78,15 @@ export function aggregateDecision(
       action: "BUY",
       confidence,
       rationale:
-        "Technical strength aligned with supportive fundamentals",
+        `Positive structure aligns for ${archetype} business`,
     };
   }
 
-  // Moderate evidence → HOLD
-  if (confidence >= 40) {
-    return {
-      action: "HOLD",
-      confidence,
-      rationale:
-        "Evidence incomplete or conflicting; monitoring without action",
-    };
-  }
-
-  // Low evidence quality → AVOID
+  // Default HOLD with semantics
   return {
-    action: "AVOID",
+    action: confidence > 30 ? "HOLD" : "AVOID",
     confidence,
     rationale:
-      "Insufficient reliable information to justify exposure",
+      `Insufficient confirmation for ${archetype} risk profile`,
   };
 }
