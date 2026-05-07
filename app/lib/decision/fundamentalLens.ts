@@ -1,5 +1,7 @@
+// app/lib/decision/fundamentalLens.ts
+
 import { LensOutcome } from "./decisionEngine";
-import { Evidence } from "./technicalLens";
+import { Evidence } from "./deriveTechnicalEvidence";
 
 export interface FundamentalInput {
   pe: Evidence<number>;
@@ -11,6 +13,7 @@ export interface FundamentalInput {
 export function fundamentalLens(
   input: FundamentalInput
 ): LensOutcome {
+  // If any core fundamental is unknown, remain conservative
   if (
     input.pe.status !== "KNOWN" ||
     input.pe5yMedian.status !== "KNOWN" ||
@@ -19,14 +22,13 @@ export function fundamentalLens(
   ) {
     return {
       decision: "HOLD",
-      reason:
-        "Fundamental data incomplete; no valuation inference made",
+      reason: "Fundamental data incomplete or unavailable",
       confidence: 25,
     };
   }
 
-  const peExpensive = input.pe.value >
-    input.pe5yMedian.value * 1.15;
+  const peExpensive =
+    input.pe.value > input.pe5yMedian.value * 1.15;
 
   const promoterReducing =
     input.promoterHolding.value <
@@ -35,25 +37,23 @@ export function fundamentalLens(
   if (peExpensive && promoterReducing) {
     return {
       decision: "SELL",
-      reason:
-        "Valuation stretched and promoter holding declining",
-      confidence: 80,
+      reason: "Valuation stretched with declining promoter holding",
+      confidence: 70,
     };
   }
 
   if (!peExpensive && !promoterReducing) {
     return {
-      decision: "HOLD",
-      reason:
-        "Valuation and ownership stable but not compelling",
+      decision: "BUY",
+      reason: "Valuation reasonable with stable promoter holding",
       confidence: 55,
     };
   }
 
   return {
     decision: "HOLD",
-    reason:
-      "Mixed fundamental signals",
+    reason: "Mixed fundamental signals",
     confidence: 40,
   };
 }
+``
