@@ -4,6 +4,7 @@ export type LensDecision = "BUY" | "HOLD" | "SELL";
 export interface LensOutcome {
   decision: LensDecision;
   reason: string;
+  confidence: number; // 0–100
 }
 
 export interface ScriptInsight {
@@ -16,17 +17,33 @@ export interface ScriptInsight {
   aiCommentary: string;
 
   finalAction: FinalAction;
+  finalConfidence: number;
   finalRationale: string;
 }
 
+/**
+ * Aggregate all lenses into a single decision.
+ * Final confidence is a weighted blend.
+ */
 export function aggregateDecision(
   t: LensOutcome,
   f: LensOutcome,
   m: LensOutcome
-): { action: FinalAction; rationale: string } {
+): {
+  action: FinalAction;
+  confidence: number;
+  rationale: string;
+} {
+  const confidence = Math.round(
+    t.confidence * 0.3 +
+      f.confidence * 0.5 +
+      m.confidence * 0.2
+  );
+
   if (f.decision === "SELL" && t.decision === "SELL") {
     return {
       action: "SELL",
+      confidence,
       rationale:
         "Weak fundamentals reinforced by deteriorating technical structure",
     };
@@ -35,6 +52,7 @@ export function aggregateDecision(
   if (m.decision === "BUY" && f.decision === "SELL") {
     return {
       action: "HOLD",
+      confidence,
       rationale:
         "Tactical momentum acknowledged, but fundamentals limit conviction",
     };
@@ -43,6 +61,7 @@ export function aggregateDecision(
   if (t.decision === "BUY" && f.decision === "BUY") {
     return {
       action: "BUY",
+      confidence,
       rationale:
         "Technical strength aligned with supportive fundamentals",
     };
@@ -51,6 +70,7 @@ export function aggregateDecision(
   if (t.decision === "SELL") {
     return {
       action: "SELL",
+      confidence,
       rationale:
         "Technical weakness outweighs supportive context",
     };
@@ -58,6 +78,8 @@ export function aggregateDecision(
 
   return {
     action: "HOLD",
-    rationale: "Mixed signals; maintaining position",
+    confidence,
+    rationale:
+      "Mixed signals; maintaining position with caution",
   };
 }
