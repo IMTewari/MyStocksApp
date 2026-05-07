@@ -1,53 +1,38 @@
-import { aggregateDecision } from "./decisionEngine";
-import { technicalLens, Evidence } from "./technicalLens";
-import { fundamentalLens } from "./fundamentalLens";
-import { marketLens } from "./marketLens";
-import { fetchContextualEvidence } from "./contextualAI";
+// app/lib/decision/buildInsight.ts
 
-export async function buildInsight(
+import { aggregateDecision } from "./decisionEngine";
+import { technicalLens } from "./technicalLens";
+import { fundamentalLens } from "./fundamentalLens";
+export async function buildInsight(import { marketLens } from "./marketLens";
   symbol: string,
   data: {
-    technical: {
-      below200dma: Evidence<boolean>;
-      momentumUp: Evidence<boolean>;
-    };
-    fundamental: {
-      pe: Evidence<number>;
-      pe5yMedian: Evidence<number>;
-      promoterHolding: Evidence<number>;
-      promoterHolding3mAgo: Evidence<number>;
-    };
-    market: {
-      recentDrawdownPct: Evidence<number>;
-      liquidityReturning: Evidence<boolean>;
-      macroRiskHigh: Evidence<boolean>;
-    };
+    candles: number[];
+    fundamental: any;
+    market: any;
+    contextualEvidence: any[];
   }
 ) {
-  const technical = technicalLens(data.technical);
+  const technicalEvidence = deriveTechnicalEvidence(data.candles);
+
+  const technical = technicalLens(technicalEvidence);
   const fundamental = fundamentalLens(data.fundamental);
   const market = marketLens(data.market);
 
-  const contextualEvidence = await fetchContextualEvidence(
-    symbol
-  );
-
-  const final = aggregateDecision(
-    technical,
-    fundamental,
-    market
-  );
+  const final = aggregateDecision(technical, fundamental, market);
 
   return {
     symbol,
     technical,
     fundamental,
     market,
-    contextualEvidence,
+    contextualEvidence: data.contextualEvidence,
     aiCommentary:
-      "External events introduce additional risk considerations alongside signal-based evaluation.",
+      "Assessment based on observed technical structure and available evidence.",
     finalAction: final.action,
     finalConfidence: final.confidence,
     finalRationale: final.rationale,
   };
 }
+``
+import { deriveTechnicalEvidence } from "./deriveTechnicalEvidence";
+
