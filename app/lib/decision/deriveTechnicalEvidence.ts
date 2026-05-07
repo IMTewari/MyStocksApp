@@ -1,4 +1,9 @@
-// app/lib/decision/deriveTechnicalEvidence.ts evidence container.
+// app/lib/decision/deriveTechnicalEvidence.ts
+
+import { ema, rsi } from "./technicalIndicators";
+
+/**
+ * Factual evidence container.
  * If something cannot be computed, it must be UNKNOWN.
  */
 export type Evidence<T> =
@@ -6,8 +11,8 @@ export type Evidence<T> =
   | { status: "UNKNOWN"; reason: string };
 
 /**
- * Canonical technical evidence derived from price ONLY.
- * No assumptions, no opinions, no market context.
+ * Canonical technical evidence derived strictly from price.
+ * No assumptions, no opinions, no placeholders.
  */
 export function deriveTechnicalEvidence(closePrices: number[]) {
   // Guard: insufficient history
@@ -15,7 +20,7 @@ export function deriveTechnicalEvidence(closePrices: number[]) {
     return {
       below200dma: {
         status: "UNKNOWN",
-        reason: "Less than 200 data points",
+        reason: "Less than 200 data points available",
       } as Evidence<boolean>,
 
       momentumUp: {
@@ -30,7 +35,7 @@ export function deriveTechnicalEvidence(closePrices: number[]) {
     };
   }
 
-  // === Derived facts (deterministic) ===
+  // === Canonical derived facts ===
   const ema20 = ema(closePrices, 20);
   const ema50 = ema(closePrices, 50);
   const ema200 = ema(closePrices, 200);
@@ -44,8 +49,7 @@ export function deriveTechnicalEvidence(closePrices: number[]) {
 
   return {
     /**
-     * Structural trend state
-     * This is an uncontested canonical fact.
+     * Structural trend state (price vs long-term trend)
      */
     below200dma: {
       status: "KNOWN",
@@ -53,8 +57,7 @@ export function deriveTechnicalEvidence(closePrices: number[]) {
     } as Evidence<boolean>,
 
     /**
-     * Momentum structure
-     * Short-term directional state, not sentiment.
+     * Momentum structure (short-term vs medium-term)
      */
     momentumUp: {
       status: "KNOWN",
@@ -62,8 +65,7 @@ export function deriveTechnicalEvidence(closePrices: number[]) {
     } as Evidence<boolean>,
 
     /**
-     * Directional bias
-     * RSI is used ONLY as a state indicator.
+     * Directional bias indicator
      */
     rsiAbove50: {
       status: "KNOWN",
@@ -71,7 +73,3 @@ export function deriveTechnicalEvidence(closePrices: number[]) {
     } as Evidence<boolean>,
   };
 }
-
-import { ema, rsi } from "./technicalIndicators";
-
-/**
