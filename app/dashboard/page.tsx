@@ -7,8 +7,6 @@ import { CoachSummary } from "./Coach";
 import ScriptDecisionCard from "@/app/components/ScriptDecisionCard";
 import { buildInsight } from "@/app/lib/decision/buildInsight";
 
-``
-
 type HoldingRow = {
   instrument_token: number;
   tradingsymbol: string;
@@ -60,7 +58,7 @@ export default function Dashboard() {
   }, []);
 
   /* ===============================
-     LTP polling (FIXED &)
+     LTP polling
      =============================== */
   useEffect(() => {
     if (!rows.length) return;
@@ -91,9 +89,7 @@ export default function Dashboard() {
             };
           })
         );
-      } catch {
-        // silent
-      }
+      } catch {}
     };
 
     tick();
@@ -102,7 +98,7 @@ export default function Dashboard() {
   }, [rows]);
 
   /* ===============================
-     Compute existing coach signals
+     Existing coach signals
      =============================== */
   useEffect(() => {
     (async () => {
@@ -142,40 +138,56 @@ export default function Dashboard() {
     })();
   }, [rows]);
 
+  /* ===============================
+     Build AI insights FOR ALL SCRIPTS
+     =============================== */
   useEffect(() => {
-  if (!rows.length) return;
+    if (!rows.length) return;
 
-  (async () => {
-    const out: any[] = [];
+    (async () => {
+      const all: any[] = [];
 
-    for (const r of rows) {
-      try {
-        // Map YOUR existing data to insight inputs
-        const insight = await buildInsight(r.tradingsymbol, {
-          technical: {
-            below200dma: flags[r.tradingsymbol]?.some(
-              (f: any) => f.type === "below_200dma"
-            ) ?? false,
-            momentumUp: true, // plug real momentum later
-          },
-          market: {
-            recentDrawdownPct: 15, // can compute
-            liquidityReturning: true,
-            macroRiskHigh: false,
-          },
-          sector: "General",
-          context: "recent market volatility and risk adjustment",
-        });
+      for (const r of rows) {
+        try {
+          const insight = await buildInsight(r.tradingsymbol, {
+            technical: {
+              below200dma:
+                flags[r.tradingsymbol]?.some(
+                  (f: any) => f.type === "below_200dma"
+                ) ?? false,
+              momentumUp: true,
+            },
 
-        out.push(insight);
-      } catch (e) {
-        console.error("Insight build failed", r.tradingsymbol, e);
+            fundamental: {
+              pe: 25,                   // placeholder
+              pe5yMedian: 22,           // placeholder
+              promoterHolding: 50,      // placeholder
+              promoterHolding3mAgo: 50, // placeholder
+            },
+
+            market: {
+              recentDrawdownPct: 15,
+              liquidityReturning: true,
+              macroRiskHigh: false,
+            },
+
+            sector: "General",
+            context: "recent market volatility and risk adjustment",
+          });
+
+          all.push(insight);
+        } catch (e) {
+          console.error(
+            "Failed to build insight for",
+            r.tradingsymbol,
+            e
+          );
+        }
       }
-    }
 
-    setInsights(out);
-  })();
-}, [rows, flags]);
+      setInsights(all);
+    })();
+  }, [rows, flags]);
 
   const valuation = useMemo(
     () =>
@@ -185,8 +197,6 @@ export default function Dashboard() {
       ),
     [rows]
   );
-
-  const total = valuation;
 
   /* ===============================
      Render
@@ -203,104 +213,27 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* EXISTING SUMMARY (UNCHANGED) */}
       <CoachSummary rows={rows} flags={flags} tips={tips} />
 
       <div style={{ marginBottom: 16, color: "#666" }}>
         Valuation: ₹{Math.round(valuation).toLocaleString()}
       </div>
 
-      {/* 🔹 EXISTING HOLDINGS VIEW (UNCHANGED) */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {rows.map(r => {
-          const pnl =
-            (r.last_price - r.average_price) * r.quantity;
-          const value = r.last_price * r.quantity;
-          const allocationPct = total
-            ? Math.round((value / total) * 100)
-            : 0;
-
-          const f = flags[r.tradingsymbol] || [];
-          const t = tips[r.tradingsymbol];
-
-          return (
-            <div
-              key={r.tradingsymbol}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: 8,
-                padding: 12,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600 }}>
-                    {r.tradingsymbol}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "#666",
-                    }}
-                  >
-                    Qty {r.quantity} · Avg ₹{r.average_price} ·
-                    Alloc {allocationPct}%
-                  </div>
-                </div>
-
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 600 }}>
-                    LTP ₹{r.last_price.toFixed(2)}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color:
-                        pnl >= 0 ? "green" : "crimson",
-                    }}
-                  >
-                    P&amp;L ₹{pnl.toFixed(2)}
-                  </div>
-                </div>
-              </div>
-
-              {t && (
-                <div style={{ marginTop: 6, fontSize: 14 }}>
-                  <strong>Coach:</strong>{" "}
-                  {t.action.toUpperCase()} — {t.reason}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ======================================================
-         ✅ NEW SECTION: AI INVESTMENT DECISIONS (SAFE ADD-ON)
-         ====================================================== */}
-
+      {/* ===============================
+         AI Investment Decisions
+         =============================== */}
       <h2 style={{ marginTop: 32 }}>
         AI Investment Decisions
       </h2>
 
-      <h2 style={{ marginTop: 32 }}>
-  AI Investment Decisions
-</h2>
-
-<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-  {insights.map(insight => (
-    <ScriptDecisionCard
-      key={insight.symbol}
-      insight={insight}
-    />
-  ))}
-</div>
-``
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {insights.map(insight => (
+          <ScriptDecisionCard
+            key={insight.symbol}
+            insight={insight}
+          />
+        ))}
+      </div>
     </main>
   );
 }
