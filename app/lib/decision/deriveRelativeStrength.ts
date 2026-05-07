@@ -1,16 +1,29 @@
-export function relativeStrength(
+// app/lib/decision/deriveRelativeStrength.ts
+
+/**
+ * Relative performance of stock vs index over same window.
+ * Positive → outperformance
+ * Negative → underperformance
+ */
+export function deriveRelativeStrength(
   stockCloses: number[],
-  indexCloses: number[]
-): number {
-  if (stockCloses.length < 200 || indexCloses.length < 200) return 0;
+  indexCloses: number[],
+  lookback = 200
+): number | null {
+  if (
+    stockCloses.length < lookback ||
+    indexCloses.length < lookback
+  ) {
+    return null;
+  }
 
-  const stockRet =
+  const stockReturn =
     stockCloses[stockCloses.length - 1] /
-    stockCloses[stockCloses.length - 200];
+    stockCloses[stockCloses.length - lookback];
 
-  const indexRet =
+  const indexReturn =
     indexCloses[indexCloses.length - 1] /
-    indexCloses[indexCloses.length - 200];
+    indexCloses[indexCloses.length - lookback];
 
-  return stockRet - indexRet;
+  return stockReturn - indexReturn;
 }
