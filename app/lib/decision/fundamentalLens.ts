@@ -1,10 +1,19 @@
 import { LensDecision, LensOutcome } from "./decisionEngine";
 
-export interface Fundamental: number;export interface FundamentalInput {
+/**
+ * Raw fundamental data required by the lens
+ */
+export interface FundamentalInput {
+  pe: number;
+  pe5yMedian: number;
   promoterHolding: number;
   promoterHolding3mAgo: number;
 }
 
+/**
+ * Fundamental analysis lens
+ * Deterministic, explainable, strictly typed
+ */
 export function fundamentalLens(
   input: FundamentalInput
 ): LensOutcome {
@@ -16,7 +25,7 @@ export function fundamentalLens(
     return {
       decision: "SELL" as LensDecision,
       reason:
-        "Valuation stretched versus history and promoter holding declining",
+        "Valuation stretched vs history and promoter holding declining",
       confidence: 80,
     };
   }
@@ -27,5 +36,13 @@ export function fundamentalLens(
       reason:
         "Valuation reasonable with stable promoter ownership",
       confidence: 70,
+    };
+  }
 
-  pe: number;
+  return {
+    decision: "HOLD" as LensDecision,
+    reason:
+      "Fundamentals stable but not strong enough for action",
+    confidence: 50,
+  };
+}
