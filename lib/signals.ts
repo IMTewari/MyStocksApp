@@ -1,8 +1,16 @@
 import { ema, rsi } from "./indicators";
 
-type Candles = { c: number }[];
+/* ===============================
+   Type definitions
+   =============================== */
 
-  qty: number;type Holding = {
+type Candles = {
+  c: number;
+}[];
+
+type Holding = {
+  symbol: string;
+  qty: number;
   avg: number;
   ltp: number;
   candles: Candles;
@@ -23,24 +31,21 @@ export type Tip = {
 /* ===============================
    Professional thresholds
    =============================== */
+
 const TH = {
   concentration: 0.25,
-
   rsiLow: 35,
   rsiHigh: 65,
-
   drawdownWarn: 0.20,
   drawdownExit: 0.30,
-
   pnlExit: -0.50,
-
-  // Soft‑trend tolerance
   dmaTolerance: 0.02, // 2%
 };
 
 /* ===============================
    Helpers
    =============================== */
+
 function computeDrawdown(closes: number[], price: number): number {
   const window = closes.slice(-250);
   if (!window.length) return 0;
@@ -54,6 +59,7 @@ function computeDrawdown(closes: number[], price: number): number {
 /* ===============================
    Professional Signal Engine
    =============================== */
+
 export function computeSignals(holdings: Holding[]) {
   const totalValue = holdings.reduce((s, h) => s + h.qty * h.ltp, 0);
 
@@ -83,14 +89,8 @@ export function computeSignals(holdings: Holding[]) {
     const lastRsi = rsi(closes, 14).at(-1)!;
     const drawdown = computeDrawdown(closes, h.ltp);
 
-    /* ===============================
-       TREND REGIME (Professional)
-       =============================== */
-    let regime:
-      | "strong_uptrend"
-      | "soft_uptrend"
-      | "range"
-      | "downtrend";
+    /* ===== Trend Regime ===== */
+    let regime: "strong_uptrend" | "soft_uptrend" | "range" | "downtrend";
 
     const above200 = h.ltp > ema200;
     const ema50Above200 = ema50 > ema200;
@@ -107,9 +107,7 @@ export function computeSignals(holdings: Holding[]) {
       regime = "range";
     }
 
-    /* ===============================
-       Risk context flags
-       =============================== */
+    /* ===== Risk flags ===== */
     if (drawdown > TH.drawdownWarn) {
       list.push({
         type: "drawdown",
@@ -134,14 +132,11 @@ export function computeSignals(holdings: Holding[]) {
       });
     }
 
-    /* ===============================
-       DECISION ENGINE
-       =============================== */
+    /* ===== Decision ===== */
     let action: Tip["action"] = "hold";
     let reason = "";
     let confidence: Tip["confidence"] = "low";
 
-    /* === Capital protection always first === */
     if (
       pnlPct <= TH.pnlExit ||
       (regime === "downtrend" && drawdown > TH.drawdownExit)
@@ -149,45 +144,25 @@ export function computeSignals(holdings: Holding[]) {
       action = "exit";
       reason = "Below 200 DMA with sustained weakness; capital protection";
       confidence = "high";
-    }
-
-    /* === Strong uptrend === */
-    else if (regime === "strong_uptrend") {
+    } else if (regime === "strong_uptrend") {
       if (ema20 > ema50 && lastRsi >= 45 && lastRsi <= 60) {
         action = "add";
         reason =
-          "Strong uptrend above 200 DMA with supportive momentum";
+          "Above 200 DMA with strong structure and supportive momentum";
         confidence = "med";
       } else {
-        action = "hold";
         reason =
-          "Strong uptrend intact; waiting for better risk‑reward";
-        confidence = "low";
+          "Strong uptrend intact; waiting for better risk–reward";
       }
-    }
-
-    /* === Soft uptrend (NEW) === */
-    else if (regime === "soft_uptrend") {
-      action = "hold";
+    } else if (regime === "soft_uptrend") {
       reason =
         "Above 200 DMA, but trend strength moderate; maintaining exposure";
-      confidence = "low";
-    }
-
-    /* === Range bound === */
-    else if (regime === "range") {
-      action = "hold";
+    } else if (regime === "range") {
       reason =
         "Trading between key averages; no structural trend established";
-      confidence = "low";
-    }
-
-    /* === Downtrend without panic === */
-    else {
-      action = "hold";
+    } else {
       reason =
         "Below 200 DMA; avoiding additional exposure";
-      confidence = "low";
     }
 
     flags[h.symbol] = list;
@@ -196,4 +171,3 @@ export function computeSignals(holdings: Holding[]) {
 
   return { flags, tips };
 }
-  symbol: string;
