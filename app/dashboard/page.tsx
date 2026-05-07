@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect from "react";
 import { computeSignals } from "@/lib/signals";
 import { CoachSummary } from "./Coach";
 
 import ScriptDecisionCard from "@/app/components/ScriptDecisionCard";
 import { buildInsight } from "@/app/lib/decision/buildInsight";
-import { Evidence } from "@/app/lib/decision/technicalLens";
 
 type HoldingRow = {
   instrument_token: number;
@@ -17,12 +16,17 @@ type HoldingRow = {
   last_price: number;
 };
 
+type Candle = { c: number };
+
 export default function Dashboard() {
   const [rows, setRows] = useState<HoldingRow[]>([]);
   const [tips, setTips] = useState<Record<string, any>>({});
   const [flags, setFlags] = useState<Record<string, any>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [candlesBySymbol, setCandlesBySymbol] = useState<Record<string, Candle[]>>(
+    {}
+  );
   const [insights, setInsights] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   /* ===============================
      Load portfolio
@@ -99,7 +103,35 @@ export default function Dashboard() {
   }, [rows]);
 
   /* ===============================
-     Compute technical flags
+     Fetch OHLC candles (raw facts)
+     =============================== */
+  useEffect(() => {
+    if (!rows.length) return;
+
+    (async () => {
+      const next: Record<string, Candle[]> = {};
+
+      for (const r of rows) {
+        try {
+          const url = `/api/data/ohlc?symbol=${encodeURIComponent(
+            r.tradingsymbol
+          )}&exchange=${encodeURIComponent(r.exchange)}&days=365`;
+
+          const res = await fetch(url);
+          const data = await res.json();
+
+          next[r.tradingsymbol] = data.candles || [];
+        } catch {
+          next[r.tradingsymbol] = [];
+        }
+      }
+
+      setCandlesBySymbol(next);
+    })();
+  }, [rows]);
+
+  /* ===============================
+     Existing coach signals (unchanged)
      =============================== */
   useEffect(() => {
     (async () => {
@@ -108,39 +140,23 @@ export default function Dashboard() {
       const enriched: any[] = [];
 
       for (const r of rows) {
-        try {
-          const url = `/api/data/ohlc?symbol=${encodeURIComponent(
-            r.tradingsymbol
-          )}&exchange=${encodeURIComponent(r.exchange)}&days=365`;
-
-          const cd = await fetch(url).then(res => res.json());
-
-          enriched.push({
-            symbol: r.tradingsymbol,
-            qty: r.quantity,
-            avg: r.average_price,
-            ltp: r.last_price,
-            candles: cd.candles || [],
-          });
-        } catch {
-          enriched.push({
-            symbol: r.tradingsymbol,
-            qty: r.quantity,
-            avg: r.average_price,
-            ltp: r.last_price,
-            candles: [],
-          });
-        }
+        enriched.push({
+          symbol: r.tradingsymbol,
+          qty: r.quantity,
+          avg: r.average_price,
+          ltp: r.last_price,
+          candles: candlesBySymbol[r.tradingsymbol] || [],
+        });
       }
 
       const s = computeSignals(enriched);
       setTips(s.tips);
       setFlags(s.flags);
     })();
-  }, [rows]);
+  }, [rows, candlesBySymbol]);
 
   /* ===============================
-     Build insights (NO assumptions)
+     Build Insights (CANONICAL FACTS)
      =============================== */
   useEffect(() => {
     if (!rows.length) return;
@@ -149,42 +165,30 @@ export default function Dashboard() {
       const out: any[] = [];
 
       for (const r of rows) {
+        const rawCandles = candlesBySymbol[r.tradingsymbol] || [];
+        const closePrices = rawCandles.map(c => c.c);
+
         const insight = await buildInsight(r.tradingsymbol, {
-          technical: {
-            below200dma: flags[r.tradingsymbol]
-              ? {
-                  status: "KNOWN",
-                  value: flags[r.tradingsymbol].some(
-                    (f: any) => f.type === "below_200dma"
-                  ),
-                }
-              : {
-                  status: "UNKNOWN",
-                  reason: "No long-term trend flag available",
-                },
+          candles: closePrices,
 
-            momentumUp: {
-              status: "UNKNOWN",
-              reason: "Momentum model not implemented",
-            },
-          },
-
+          // Fundamentals intentionally UNKNOWN unless wired
           fundamental: {
-            pe: { status: "UNKNOWN", reason: "PE not loaded" },
+            pe: { status: "UNKNOWN", reason: "PE not wired" },
             pe5yMedian: {
               status: "UNKNOWN",
-              reason: "PE history not loaded",
+              reason: "Historical PE not wired",
             },
             promoterHolding: {
               status: "UNKNOWN",
-              reason: "Promoter data not loaded",
+              reason: "Promoter data not wired",
             },
             promoterHolding3mAgo: {
               status: "UNKNOWN",
-              reason: "Promoter history not loaded",
+              reason: "Promoter history not wired",
             },
           },
 
+          // Market context intentionally UNKNOWN unless wired
           market: {
             recentDrawdownPct: {
               status: "UNKNOWN",
@@ -192,13 +196,15 @@ export default function Dashboard() {
             },
             liquidityReturning: {
               status: "UNKNOWN",
-              reason: "Liquidity regime unknown",
+              reason: "Liquidity regime not identified",
             },
             macroRiskHigh: {
               status: "UNKNOWN",
               reason: "Macro risk model not wired",
             },
           },
+
+          contextualEvidence: [],
         });
 
         out.push(insight);
@@ -206,7 +212,7 @@ export default function Dashboard() {
 
       setInsights(out);
     })();
-  }, [rows, flags]);
+  }, [rows, candlesBySymbol]);
 
   const valuation = useMemo(
     () =>
@@ -221,7 +227,7 @@ export default function Dashboard() {
      Render
      =============================== */
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
+    <main style={{ maxWidth: 1000, margin: "0 auto", padding: 16 }}>
       <h1 style={{ fontSize: 24, fontWeight: 600 }}>
         Portfolio Coach
       </h1>
@@ -253,3 +259,4 @@ export default function Dashboard() {
     </main>
   );
 }
+``
