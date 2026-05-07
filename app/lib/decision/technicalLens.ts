@@ -3,65 +3,53 @@
 import { LensOutcome } from "./decisionEngine";
 import { Evidence } from "./deriveTechnicalEvidence";
 
-/**
- * Technical inputs are factual, derived evidence.
- * No assumptions, no placeholders.
- */
 export interface TechnicalInput {
   below200dma: Evidence<boolean>;
   momentumUp: Evidence<boolean>;
   rsiAbove50: Evidence<boolean>;
+  relativeStrength: Evidence<number>;
 }
 
-/**
- * Canonical technical lens.
- * Interprets structural state — not prediction.
- */
 export function technicalLens(
   input: TechnicalInput
 ): LensOutcome {
-  // All facts known → strong signals allowed
+  // Relative strength is the differentiator
   if (
-    input.below200dma.status === "KNOWN" &&
-    input.momentumUp.status === "KNOWN" &&
-    input.rsiAbove50.status === "KNOWN"
+    input.relativeStrength.status === "KNOWN"
   ) {
-    // Structural weakness
-    if (input.below200dma.value && !input.momentumUp.value) {
+    if (input.relativeStrength.value > 0.08) {
       return {
-        decision: "SELL",
-        reason: "Below long-term trend with weakening momentum",
+        decision: "BUY",
+        reason: "Consistent outperformance vs index",
         confidence: 65,
       };
     }
 
-    // Structural strength
-    if (
-      !input.below200dma.value &&
-      input.momentumUp.value &&
-      input.rsiAbove50.value
-    ) {
+    if (input.relativeStrength.value < -0.08) {
       return {
-        decision: "BUY",
-        reason: "Above trend with positive momentum and strength",
-        confidence: 60,
-      };
-    }
-
-    // Positive bias but not decisive
-    if (!input.below200dma.value && input.rsiAbove50.value) {
-      return {
-        decision: "HOLD",
-        reason: "Holding above trend with positive bias",
-        confidence: 50,
+        decision: "SELL",
+        reason: "Persistent underperformance vs index",
+        confidence: 65,
       };
     }
   }
 
-  // Default conservative posture
+  // Structural fallback
+  if (
+    input.below200dma.status === "KNOWN" &&
+    input.below200dma.value
+  ) {
+    return {
+      decision: "HOLD",
+      reason: "Below long-term trend",
+      confidence: 40,
+    };
+  }
+
   return {
     decision: "HOLD",
-    reason: "No decisive technical edge",
-    confidence: 40,
+    reason: "No relative edge detected",
+    confidence: 45,
   };
 }
+``
