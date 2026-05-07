@@ -1,5 +1,14 @@
-export type FinalAction = "BUY" | "HOLD" | "SELL" | "EXIT" | "AVOID";
 export type LensDecision = "BUY" | "HOLD" | "SELL";
+
+/**
+ NOT NARROW)
+ */
+export type FinalAction =
+  | "BUY"
+  | "HOLD"
+  | "SELL"
+  | "EXIT"
+  | "AVOID";
 
 export interface LensOutcome {
   decision: LensDecision;
@@ -22,8 +31,8 @@ export interface ScriptInsight {
 }
 
 /**
- * Aggregate all lenses into a single decision.
- * Final confidence is a weighted blend.
+ * Portfolio-grade aggregation.
+ * No assumptions. UNKNOWN depresses confidence.
  */
 export function aggregateDecision(
   t: LensOutcome,
@@ -34,52 +43,64 @@ export function aggregateDecision(
   confidence: number;
   rationale: string;
 } {
-  const confidence = Math.round(
+  const baseConfidence =
     t.confidence * 0.3 +
-      f.confidence * 0.5 +
-      m.confidence * 0.2
+    f.confidence * 0.5 +
+    m.confidence * 0.2;
+
+  const unknownPenalty =
+    [t, f, m].filter(x => x.confidence < 40).length * 15;
+
+  const confidence = Math.max(
+    0,
+    Math.round(baseConfidence - unknownPenalty)
   );
 
-  if (f.decision === "SELL" && t.decision === "SELL") {
+  // Strong negative alignment → EXIT
+  if (t.decision === "SELL" && f.decision === "SELL") {
+    return {
+      action: "EXIT",
+      confidence,
+      rationale:
+        "Technical and fundamental signals jointly indicate capital risk",
+    };
+  }
+
+  // Structural negative → SELL
+  if (f.decision === "SELL") {
     return {
       action: "SELL",
       confidence,
       rationale:
-        "Weak fundamentals reinforced by deteriorating technical structure",
+        "Fundamental deterioration outweighs tactical considerations",
     };
   }
 
-  if (m.decision === "BUY" && f.decision === "SELL") {
-    return {
-      action: "HOLD",
-      confidence,
-      rationale:
-        "Tactical momentum acknowledged, but fundamentals limit conviction",
-    };
-  }
-
+  // Strong positive alignment → BUY
   if (t.decision === "BUY" && f.decision === "BUY") {
     return {
       action: "BUY",
       confidence,
       rationale:
-        "Technical strength aligned with supportive fundamentals",
+        "Positive technical structure aligned with supportive fundamentals",
     };
   }
 
-  if (t.decision === "SELL") {
+  // Evidence weak or incomplete → HOLD
+  if (confidence >= 40) {
     return {
-      action: "SELL",
+      action: "HOLD",
       confidence,
       rationale:
-        "Technical weakness outweighs supportive context",
+        "Evidence insufficient for decisive action; monitoring",
     };
   }
 
+  // High uncertainty → AVOID
   return {
-    action: "HOLD",
+    action: "AVOID",
     confidence,
     rationale:
-      "Mixed signals; maintaining position with caution",
+      "Insufficient reliable information to justify exposure",
   };
 }
