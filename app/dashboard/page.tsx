@@ -1,6 +1,6 @@
 "use client";
 
-import {State } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { computeSignals } from "@/lib/signals";
 import { CoachSummary } from "./Coach";
 
