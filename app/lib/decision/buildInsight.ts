@@ -1,11 +1,9 @@
 // app/lib/decision/buildInsight.ts
 
-import { aggregateDecision } from "./decisionEngine";
-import { technicalLens } from "./technicalLens";
-import { fundamentalLens } from "./fundamentalLens";
-import { marketLens } from "./marketLens";
 import { deriveTechnicalEvidence } from "./deriveTechnicalEvidence";
-import { ContextualEvidence } from "./contextualEvidence";
+import { technicalLens } from "./technicalLens";
+import { fundamentalimport { ContextualEvidence } from "./contextualEvidence";import { fundamentalLens } from "./fundamentalLens";
+import { getBusinessArchetype } from "./businessArchetype";
 
 export async function buildInsight(
   symbol: string,
@@ -16,30 +14,36 @@ export async function buildInsight(
     contextualEvidence: ContextualEvidence[];
   }
 ) {
-  // 1️⃣ Canonical technical facts (derived, not assumed)
-  const technicalEvidence = deriveTechnicalEvidence(data.candles);
+  const archetype = getBusinessArchetype(symbol);
 
+  const technicalEvidence = deriveTechnicalEvidence(data.candles);
   const technical = technicalLens(technicalEvidence);
   const fundamental = fundamentalLens(data.fundamental);
   const market = marketLens(data.market);
 
-  // 2️⃣ Aggregate decisions conservatively
   const final = aggregateDecision(
     technical,
     fundamental,
-    market
+    market,
+    archetype
   );
 
   return {
     symbol,
+    archetype,
+
     technical,
     fundamental,
     market,
+
     contextualEvidence: data.contextualEvidence,
     aiCommentary:
-      "Assessment based on canonical technical facts, verified data, and external context. No assumptions were applied.",
+      `Evaluation performed using canonical structure for ${archetype} business.`,
+
     finalAction: final.action,
     finalConfidence: final.confidence,
     finalRationale: final.rationale,
   };
 }
+import { marketLens } from "./marketLens";
+import { aggregateDecision } from "./decisionEngine";
