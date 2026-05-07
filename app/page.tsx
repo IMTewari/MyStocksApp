@@ -1,5 +1,6 @@
 
 import Link from 'next/link';
+import { enforceDataContract } from "@/app/lib/portfolio/dataGuard";
 
 export default function Home() {
   return (
