@@ -1,4 +1,4 @@
-import";
+import { ema, rsi } from "./indicators";
 
 type Candles = { c: number }[];
 
@@ -7,7 +7,7 @@ type Holding = {
   qty: number;
   avg: number;
   ltp: number;
-  candles: Candles; // candles guaranteed by data contract
+  candles: Candles;
 };
 
 export type RedFlag = {
@@ -62,9 +62,7 @@ export function computeSignals(holdings: Holding[]) {
 
     const list: RedFlag[] = [];
 
-    /* ===============================
-       Concentration risk
-       =============================== */
+    /* ===== Concentration risk ===== */
     if (alloc > TH.concentration) {
       list.push({
         type: "concentration",
@@ -81,10 +79,7 @@ export function computeSignals(holdings: Holding[]) {
     const lastRsi = rsi(closes, 14).at(-1)!;
     const drawdown = computeDrawdown(closes, h.ltp);
 
-    /* ===============================
-       PRIMARY TREND CLASSIFICATION
-       (mandatory, non-ambiguous)
-       =============================== */
+    /* ===== Primary trend (non‑negotiable) ===== */
     let regime: "uptrend" | "downtrend" | "range";
 
     if (h.ltp > ema200 && ema50 > ema200) {
@@ -95,9 +90,7 @@ export function computeSignals(holdings: Holding[]) {
       regime = "range";
     }
 
-    /* ===============================
-       Risk context flags
-       =============================== */
+    /* ===== Risk context ===== */
     if (drawdown > TH.drawdownWarn) {
       list.push({
         type: "drawdown",
@@ -122,14 +115,12 @@ export function computeSignals(holdings: Holding[]) {
       });
     }
 
-    /* ===============================
-       ACTION DECISION
-       =============================== */
+    /* ===== Decision ===== */
     let action: Tip["action"] = "hold";
-    let confidence: Tip["confidence"] = "low";
     let reason = "";
+    let confidence: Tip["confidence"] = "low";
 
-    /* === CAPITAL PROTECTION (highest priority) === */
+    // Capital protection first
     if (
       pnlPct <= TH.pnlExit ||
       (regime === "downtrend" && drawdown > TH.drawdownExit)
@@ -139,45 +130,36 @@ export function computeSignals(holdings: Holding[]) {
       confidence = "high";
     }
 
-    /* === STRUCTURAL UPTREND === */
+    // Structural uptrend
     else if (regime === "uptrend") {
       if (ema20 > ema50 && lastRsi >= 45 && lastRsi <= 60) {
         action = "add";
-        reason = "Above 200 DMA with positive structure and supportive momentum";
+        reason =
+          "Above 200 DMA with supportive structure and healthy momentum";
         confidence = "med";
       } else if (lastRsi < 45) {
-        action = "hold";
-        reason = "Above 200 DMA, but momentum weak; waiting for confirmation";
-        confidence = "low";
+        reason =
+          "Above 200 DMA, but momentum weak; waiting for confirmation";
       } else {
-        action = "hold";
-        reason = "Primary uptrend intact; no immediate risk‑reward advantage";
-        confidence = "low";
+        reason =
+          "Primary uptrend intact; no immediate risk‑reward advantage";
       }
     }
 
-    /* === RANGE-BOUND REGIME === */
+    // Range
     else if (regime === "range") {
-      action = "hold";
       reason =
         "Price oscillating between 20 and 50 DMA; trend not established";
-      confidence = "low";
     }
 
-    /* === STRUCTURAL DOWNTREND (but no panic) === */
+    // Downtrend without panic
     else {
-      action = "hold";
       reason =
         "Below 200 DMA; downtrend persists, avoiding additional exposure";
-      confidence = "low";
     }
 
     flags[h.symbol] = list;
-    tips[h.symbol] = {
-      action,
-      reason,
-      confidence,
-    };
+    tips[h.symbol] = { action, reason, confidence };
   }
 
   return { flags, tips };
