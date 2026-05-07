@@ -3,13 +3,26 @@
 import { LensOutcome } from "./decisionEngine";
 import { Evidence } from "./deriveTechnicalEvidence";
 
+/**
+ * Re-export Evidence so callers can import it
+ * from the technical boundary without knowing internals.
+ */
+export type { Evidence };
+
 export interface TechnicalInput {
   below200dma: Evidence<boolean>;
   momentumUp: Evidence<boolean>;
   rsiAbove50: Evidence<boolean>;
 }
 
-export function technicalLens(input: TechnicalInput): LensOutcome {
+/**
+ * Canonical technical lens.
+ * Consumes ONLY factual, derived evidence.
+ * No assumptions, no gap-fills.
+ */
+export function technicalLens(
+  input: TechnicalInput
+): LensOutcome {
   if (
     input.below200dma.status === "KNOWN" &&
     input.momentumUp.status === "KNOWN"
