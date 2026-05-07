@@ -3,22 +3,32 @@
 import { aggregateDecision } from "./decisionEngine";
 import { technicalLens } from "./technicalLens";
 import { fundamentalLens } from "./fundamentalLens";
-export async function buildInsight(import { marketLens } from "./marketLens";
+import { marketLens } from "./marketLens";
+import { deriveTechnicalEvidence } from "./deriveTechnicalEvidence";
+import { ContextualEvidence } from "./contextualEvidence";
+
+export async function buildInsight(
   symbol: string,
   data: {
     candles: number[];
     fundamental: any;
     market: any;
-    contextualEvidence: any[];
+    contextualEvidence: ContextualEvidence[];
   }
 ) {
+  // 1️⃣ Canonical technical facts (derived, not assumed)
   const technicalEvidence = deriveTechnicalEvidence(data.candles);
 
   const technical = technicalLens(technicalEvidence);
   const fundamental = fundamentalLens(data.fundamental);
   const market = marketLens(data.market);
 
-  const final = aggregateDecision(technical, fundamental, market);
+  // 2️⃣ Aggregate decisions conservatively
+  const final = aggregateDecision(
+    technical,
+    fundamental,
+    market
+  );
 
   return {
     symbol,
@@ -27,12 +37,9 @@ export async function buildInsight(import { marketLens } from "./marketLens";
     market,
     contextualEvidence: data.contextualEvidence,
     aiCommentary:
-      "Assessment based on observed technical structure and available evidence.",
+      "Assessment based on canonical technical facts, verified data, and external context. No assumptions were applied.",
     finalAction: final.action,
     finalConfidence: final.confidence,
     finalRationale: final.rationale,
   };
 }
-``
-import { deriveTechnicalEvidence } from "./deriveTechnicalEvidence";
-
