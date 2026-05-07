@@ -1,13 +1,13 @@
-LensDecision, LensOutcome } from "./decisionEngine";
+import { LensDecision, LensOutcome } from "./decisionEngine";
 
-export interface FundamentalInput {
-  pe: number;
-  pe5yMedian: number;
+export interface Fundamental: number;export interface FundamentalInput {
   promoterHolding: number;
   promoterHolding3mAgo: number;
 }
 
-export function fundamentalLens(input: FundamentalInput): LensOutcome {
+export function fundamentalLens(
+  input: FundamentalInput
+): LensOutcome {
   const peExpensive = input.pe > input.pe5yMedian * 1.15;
   const promoterReducing =
     input.promoterHolding < input.promoterHolding3mAgo;
@@ -27,14 +27,5 @@ export function fundamentalLens(input: FundamentalInput): LensOutcome {
       reason:
         "Valuation reasonable with stable promoter ownership",
       confidence: 70,
-    };
-  }
 
-  return {
-    decision: "HOLD" as LensDecision,
-    reason:
-      "Fundamentals stable but not strong enough for action",
-    confidence: 50,
-  };
-}
-``
+  pe: number;
