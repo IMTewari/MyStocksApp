@@ -2,6 +2,7 @@ import { aggregateDecision } from "./decisionEngine";
 import { technicalLens, Evidence } from "./technicalLens";
 import { fundamentalLens } from "./fundamentalLens";
 import { marketLens } from "./marketLens";
+import { fetchContextualEvidence } from "./contextualAI";
 
 export async function buildInsight(
   symbol: string,
@@ -27,6 +28,10 @@ export async function buildInsight(
   const fundamental = fundamentalLens(data.fundamental);
   const market = marketLens(data.market);
 
+  const contextualEvidence = await fetchContextualEvidence(
+    symbol
+  );
+
   const final = aggregateDecision(
     technical,
     fundamental,
@@ -38,8 +43,9 @@ export async function buildInsight(
     technical,
     fundamental,
     market,
+    contextualEvidence,
     aiCommentary:
-      "Decision reflects available evidence only; no assumptions made.",
+      "External events introduce additional risk considerations alongside signal-based evaluation.",
     finalAction: final.action,
     finalConfidence: final.confidence,
     finalRationale: final.rationale,
