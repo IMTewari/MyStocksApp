@@ -1,5 +1,3 @@
-// decisionEngine.ts
-
 export type FinalAction = "BUY" | "HOLD" | "SELL" | "EXIT" | "AVOID";
 export type LensDecision = "BUY" | "HOLD" | "SELL";
 
@@ -14,45 +12,35 @@ export interface ScriptInsight {
   technical: LensOutcome;
   fundamental: LensOutcome;
   market: LensOutcome;
+
   aiCommentary: string;
 
   finalAction: FinalAction;
   finalRationale: string;
 }
 
-/**
- * Investment-committee–style decision aggregator
- */
 export function aggregateDecision(
-  technical: LensOutcome,
-  fundamental: LensOutcome,
-  market: LensOutcome
+  t: LensOutcome,
+  f: LensOutcome,
+  m: LensOutcome
 ): { action: FinalAction; rationale: string } {
-  // Hard exits
-  if (fundamental.decision === "SELL" && technical.decision === "SELL") {
+  if (f.decision === "SELL" && t.decision === "SELL") {
     return {
       action: "SELL",
       rationale:
-        "Weak fundamentals reinforced by poor technical structure",
+        "Weak fundamentals reinforced by deteriorating technical structure",
     };
   }
 
-  // Tactical rallies vs fundamentals
-  if (
-    market.decision === "BUY" &&
-    fundamental.decision === "SELL"
-  ) {
+  if (m.decision === "BUY" && f.decision === "SELL") {
     return {
       action: "HOLD",
       rationale:
-        "Tactical opportunity acknowledged but fundamentals limit conviction",
+        "Tactical momentum acknowledged, but fundamentals limit conviction",
     };
   }
 
-  if (
-    technical.decision === "BUY" &&
-    fundamental.decision === "BUY"
-  ) {
+  if (t.decision === "BUY" && f.decision === "BUY") {
     return {
       action: "BUY",
       rationale:
@@ -60,20 +48,16 @@ export function aggregateDecision(
     };
   }
 
-  if (
-    technical.decision === "SELL" &&
-    fundamental.decision !== "BUY"
-  ) {
+  if (t.decision === "SELL") {
     return {
       action: "SELL",
       rationale:
-        "Technical weakness outweighs other considerations",
+        "Technical weakness outweighs supportive context",
     };
   }
 
   return {
     action: "HOLD",
-    rationale:
-      "Mixed signals; maintaining position while monitoring",
+    rationale: "Mixed signals; maintaining position",
   };
 }
