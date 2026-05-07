@@ -1,5 +1,9 @@
 import { ema, rsi } from "./indicators";
 
+/* ===============================
+   Type definitions
+   =============================== */
+
 type Candles = {
   c: number;
 }[];
@@ -15,10 +19,46 @@ type Holding = {
 export type RedFlag = {
   type: string;
   message: string;
-  severity: "info" | "warn" |) return 0;  severity: "info" | "warn" | "risk";
+  severity: "info" | "warn" | "risk";
+};
+
+export type Tip = {
+  action: "add" | "trim" | "hold" | "exit";
+  reason: string;
+  confidence: "low" | "med" | "high";
+};
+
+/* ===============================
+   Thresholds
+   =============================== */
+
+const TH = {
+  concentration: 0.25,
+  rsiLow: 35,
+  rsiHigh: 65,
+  drawdownWarn: 0.2,
+  drawdownExit: 0.3,
+  pnlExit: -0.5,
+  dmaTolerance: 0.02,
+};
+
+/* ===============================
+   Helpers
+   =============================== */
+
+function computeDrawdown(closes: number[], price: number): number {
+  const window = closes.slice(-250);
+  if (window.length === 0) return 0;
+
+  const high = Math.max(...window);
+  if (high <= 0) return 0;
 
   return Math.max(0, Math.min(1 - price / high, 1));
 }
+
+/* ===============================
+   Signal engine
+   =============================== */
 
 export function computeSignals(holdings: Holding[]) {
   const totalValue = holdings.reduce((s, h) => s + h.qty * h.ltp, 0);
@@ -106,11 +146,11 @@ export function computeSignals(holdings: Holding[]) {
         confidence = "med";
       } else {
         reason =
-          "Structural uptrend intact; consolidation phase in progress";
+          "Structural uptrend intact; consolidation phase";
       }
     } else if (regime === "soft_uptrend") {
       reason =
-        "Above 200 DMA, trend intact but momentum moderate";
+        "Above 200 DMA; trend intact but momentum moderate";
     } else {
       reason =
         "Below 200 DMA; downtrend persists, avoiding exposure";
@@ -122,26 +162,3 @@ export function computeSignals(holdings: Holding[]) {
 
   return { flags, tips };
 }
-};
-
-export type Tip = {
-  action: "add" | "trim" | "hold" | "exit";
-  reason: string;
-  confidence: "low" | "med" | "high";
-};
-
-const TH = {
-  concentration: 0.25,
-  rsiLow: 35,
-  rsiHigh: 65,
-  drawdownWarn: 0.2,
-  drawdownExit: 0.3,
-  pnlExit: -0.5,
-  dmaTolerance: 0.02,
-};
-
-function computeDrawdown(closes: number[], price: number): number {
-  const window = closes.slice(-250);
-  if (!window.length) return 0;
-
-  const high = Math.max(...window);
