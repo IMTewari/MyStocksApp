@@ -1,6 +1,6 @@
 "use client";
 
-react";
+import { useEffect, useMemo, useState } from "react";
 import { computeSignals } from "@/lib/signals";
 import { CoachSummary } from "./Coach";
 
@@ -99,7 +99,7 @@ export default function Dashboard() {
   }, [rows]);
 
   /* ===============================
-     Compute technical signals
+     Compute technical flags
      =============================== */
   useEffect(() => {
     (async () => {
@@ -140,7 +140,7 @@ export default function Dashboard() {
   }, [rows]);
 
   /* ===============================
-     Build AI insights (NO assumptions)
+     Build insights (NO assumptions)
      =============================== */
   useEffect(() => {
     if (!rows.length) return;
@@ -160,39 +160,39 @@ export default function Dashboard() {
                 }
               : {
                   status: "UNKNOWN",
-                  reason: "No long-term trend signal available",
+                  reason: "No long-term trend flag available",
                 },
 
             momentumUp: {
               status: "UNKNOWN",
-              reason: "Momentum model not wired yet",
+              reason: "Momentum model not implemented",
             },
           },
 
           fundamental: {
-            pe: { status: "UNKNOWN", reason: "PE data not loaded" },
+            pe: { status: "UNKNOWN", reason: "PE not loaded" },
             pe5yMedian: {
               status: "UNKNOWN",
-              reason: "Historical PE data not loaded",
+              reason: "PE history not loaded",
             },
             promoterHolding: {
               status: "UNKNOWN",
-              reason: "Promoter holding data not loaded",
+              reason: "Promoter data not loaded",
             },
             promoterHolding3mAgo: {
               status: "UNKNOWN",
-              reason: "Historical promoter data not loaded",
+              reason: "Promoter history not loaded",
             },
           },
 
           market: {
             recentDrawdownPct: {
               status: "UNKNOWN",
-              reason: "Drawdown computation not wired",
+              reason: "Drawdown not computed",
             },
             liquidityReturning: {
               status: "UNKNOWN",
-              reason: "Liquidity regime not identified",
+              reason: "Liquidity regime unknown",
             },
             macroRiskHigh: {
               status: "UNKNOWN",
@@ -253,4 +253,3 @@ export default function Dashboard() {
     </main>
   );
 }
-``
