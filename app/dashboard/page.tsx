@@ -127,11 +127,6 @@ export default function Dashboard() {
       const enriched: any[] = [];
 
       for (const r of rows) {
-        console.log(
-  "Fetched candles:",
-  r.tradingsymbol,
-  cd.candles?.length
-);
         try {
           const url = `/api/data/ohlc?symbol=${encodeURIComponent(
             r.tradingsymbol
@@ -152,6 +147,11 @@ export default function Dashboard() {
             ltp: r.last_price,
             candles: safeCandles,
           });
+          console.log(
+  "Fetched candles:",
+  r.tradingsymbol,
+  cd.candles?.length
+);
         } catch (err) {
           console.error(
             "Skipping symbol due to data error:",
