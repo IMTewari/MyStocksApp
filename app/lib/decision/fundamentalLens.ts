@@ -1,48 +1,59 @@
-import { LensDecision, LensOutcome } from "./decisionEngine";
+import { LensOutcome } from "./decisionEngine";
+import { Evidence } from "./technicalLens";
 
-/**
- * Raw fundamental data required by the lens
- */
 export interface FundamentalInput {
-  pe: number;
-  pe5yMedian: number;
-  promoterHolding: number;
-  promoterHolding3mAgo: number;
+  pe: Evidence<number>;
+  pe5yMedian: Evidence<number>;
+  promoterHolding: Evidence<number>;
+  promoterHolding3mAgo: Evidence<number>;
 }
 
-/**
- * Fundamental analysis lens
- * Deterministic, explainable, strictly typed
- */
 export function fundamentalLens(
   input: FundamentalInput
 ): LensOutcome {
-  const peExpensive = input.pe > input.pe5yMedian * 1.15;
+  if (
+    input.pe.status !== "KNOWN" ||
+    input.pe5yMedian.status !== "KNOWN" ||
+    input.promoterHolding.status !== "KNOWN" ||
+    input.promoterHolding3mAgo.status !== "KNOWN"
+  ) {
+    return {
+      decision: "HOLD",
+      reason:
+        "Fundamental data incomplete; no valuation inference made",
+      confidence: 25,
+    };
+  }
+
+  const peExpensive = input.pe.value >
+    input.pe5yMedian.value * 1.15;
+
   const promoterReducing =
-    input.promoterHolding < input.promoterHolding3mAgo;
+    input.promoterHolding.value <
+    input.promoterHolding3mAgo.value;
 
   if (peExpensive && promoterReducing) {
     return {
-      decision: "SELL" as LensDecision,
+      decision: "SELL",
       reason:
-        "Valuation stretched vs history and promoter holding declining",
+        "Valuation stretched and promoter holding declining",
       confidence: 80,
     };
   }
 
   if (!peExpensive && !promoterReducing) {
     return {
-      decision: "BUY" as LensDecision,
+      decision: "HOLD",
       reason:
-        "Valuation reasonable with stable promoter ownership",
-      confidence: 70,
+        "Valuation and ownership stable but not compelling",
+      confidence: 55,
     };
   }
 
   return {
-    decision: "HOLD" as LensDecision,
+    decision: "HOLD",
     reason:
-      "Fundamentals stable but not strong enough for action",
-    confidence: 50,
+      "Mixed fundamental signals",
+    confidence: 40,
   };
 }
