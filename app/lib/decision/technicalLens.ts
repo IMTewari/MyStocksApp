@@ -4,8 +4,7 @@ import { LensOutcome } from "./decisionEngine";
 import { Evidence } from "./deriveTechnicalEvidence";
 
 /**
- * Canonical technical input shape.
- * This MUST match what deriveTechnicalEvidence() returns.
+ * TechnicalInput MUST match deriveTechnicalEvidence() output.
  */
 export interface TechnicalInput {
   below200dma: Evidence<boolean>;
@@ -15,15 +14,19 @@ export interface TechnicalInput {
 }
 
 /**
- * Technical lens interprets STRUCTURE, not prediction.
+ * Technical lens:
+ * - Relative strength is the PRIMARY discriminator
+ * - Structural signals are secondary
  */
 export function technicalLens(
   input: TechnicalInput
 ): LensOutcome {
 
-  // Relative strength dominates decision-making
+  // ✅ Relative strength DOMINATES (key change)
   if (input.relativeStrength.status === "KNOWN") {
-    if (input.relativeStrength.value > 0.05) {
+
+    // Outperformance vs index (≈ +2% over lookback)
+    if (input.relativeStrength.value > 0.02) {
       return {
         decision: "BUY",
         reason: "Sustained outperformance versus benchmark",
@@ -31,7 +34,8 @@ export function technicalLens(
       };
     }
 
-    if (input.relativeStrength.value < -0.05) {
+    // Underperformance vs index (≈ −2% over lookback)
+    if (input.relativeStrength.value < -0.02) {
       return {
         decision: "SELL",
         reason: "Persistent underperformance versus benchmark",
@@ -52,7 +56,7 @@ export function technicalLens(
     };
   }
 
-  // Default neutral posture
+  // Neutral / no edge
   return {
     decision: "HOLD",
     reason: "No decisive technical edge detected",
