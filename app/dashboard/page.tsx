@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+react";
 import { computeSignals } from "@/lib/signals";
 import { CoachSummary } from "./Coach";
 
 import ScriptDecisionCard from "@/app/components/ScriptDecisionCard";
 import { buildInsight } from "@/app/lib/decision/buildInsight";
+import { Evidence } from "@/app/lib/decision/technicalLens";
 
 type HoldingRow = {
   instrument_token: number;
@@ -98,7 +99,7 @@ export default function Dashboard() {
   }, [rows]);
 
   /* ===============================
-     Existing coach signals
+     Compute technical signals
      =============================== */
   useEffect(() => {
     (async () => {
@@ -139,53 +140,71 @@ export default function Dashboard() {
   }, [rows]);
 
   /* ===============================
-     Build AI insights FOR ALL SCRIPTS
+     Build AI insights (NO assumptions)
      =============================== */
   useEffect(() => {
     if (!rows.length) return;
 
     (async () => {
-      const all: any[] = [];
+      const out: any[] = [];
 
       for (const r of rows) {
-        try {
-          const insight = await buildInsight(r.tradingsymbol, {
-            technical: {
-              below200dma:
-                flags[r.tradingsymbol]?.some(
-                  (f: any) => f.type === "below_200dma"
-                ) ?? false,
-              momentumUp: true,
+        const insight = await buildInsight(r.tradingsymbol, {
+          technical: {
+            below200dma: flags[r.tradingsymbol]
+              ? {
+                  status: "KNOWN",
+                  value: flags[r.tradingsymbol].some(
+                    (f: any) => f.type === "below_200dma"
+                  ),
+                }
+              : {
+                  status: "UNKNOWN",
+                  reason: "No long-term trend signal available",
+                },
+
+            momentumUp: {
+              status: "UNKNOWN",
+              reason: "Momentum model not wired yet",
             },
+          },
 
-            fundamental: {
-              pe: 25,                   // placeholder
-              pe5yMedian: 22,           // placeholder
-              promoterHolding: 50,      // placeholder
-              promoterHolding3mAgo: 50, // placeholder
+          fundamental: {
+            pe: { status: "UNKNOWN", reason: "PE data not loaded" },
+            pe5yMedian: {
+              status: "UNKNOWN",
+              reason: "Historical PE data not loaded",
             },
-
-            market: {
-              recentDrawdownPct: 15,
-              liquidityReturning: true,
-              macroRiskHigh: false,
+            promoterHolding: {
+              status: "UNKNOWN",
+              reason: "Promoter holding data not loaded",
             },
+            promoterHolding3mAgo: {
+              status: "UNKNOWN",
+              reason: "Historical promoter data not loaded",
+            },
+          },
 
-            sector: "General",
-            context: "recent market volatility and risk adjustment",
-          });
+          market: {
+            recentDrawdownPct: {
+              status: "UNKNOWN",
+              reason: "Drawdown computation not wired",
+            },
+            liquidityReturning: {
+              status: "UNKNOWN",
+              reason: "Liquidity regime not identified",
+            },
+            macroRiskHigh: {
+              status: "UNKNOWN",
+              reason: "Macro risk model not wired",
+            },
+          },
+        });
 
-          all.push(insight);
-        } catch (e) {
-          console.error(
-            "Failed to build insight for",
-            r.tradingsymbol,
-            e
-          );
-        }
+        out.push(insight);
       }
 
-      setInsights(all);
+      setInsights(out);
     })();
   }, [rows, flags]);
 
@@ -219,9 +238,6 @@ export default function Dashboard() {
         Valuation: ₹{Math.round(valuation).toLocaleString()}
       </div>
 
-      {/* ===============================
-         AI Investment Decisions
-         =============================== */}
       <h2 style={{ marginTop: 32 }}>
         AI Investment Decisions
       </h2>
@@ -237,3 +253,4 @@ export default function Dashboard() {
     </main>
   );
 }
+``
