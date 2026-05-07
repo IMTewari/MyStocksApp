@@ -1,13 +1,13 @@
-// ScriptDecisionCard.tsx
+"use client";
 
 import { useState } from "react";
-import { ScriptInsight } from "./decisionEngine";
+import { ScriptInsight } from "@/app/lib/decision/decisionEngine";
 
 interface Props {
   insight: ScriptInsight;
 }
 
-export function ScriptDecisionCard({ insight }: Props) {
+export default function ScriptDecisionCard({ insight }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -19,20 +19,20 @@ export function ScriptDecisionCard({ insight }: Props) {
         marginBottom: 10,
       }}
     >
-      {/* TOP LINE */}
+      {/* One-word summary */}
       <div
+        onClick={() => setOpen(!open)}
         style={{
           display: "flex",
           justifyContent: "space-between",
           cursor: "pointer",
+          fontWeight: 600,
         }}
-        onClick={() => setOpen(!open)}
       >
-        <strong>{insight.symbol}</strong>
-        <strong>{insight.finalAction}</strong>
+        <span>{insight.symbol}</span>
+        <span>{insight.finalAction}</span>
       </div>
 
-      {/* EXPANDED */}
       {open && (
         <div style={{ marginTop: 10, fontSize: 14 }}>
           <Section
@@ -48,7 +48,7 @@ export function ScriptDecisionCard({ insight }: Props) {
           />
 
           <Section
-            title="Market Dynamics / Geopolitics"
+            title="Market / Geopolitics"
             decision={insight.market.decision}
             reason={insight.market.reason}
           />
@@ -79,7 +79,9 @@ function Section({
 }) {
   return (
     <div style={{ marginBottom: 6 }}>
-      <strong>{title} → {decision}</strong>
+      <strong>
+        {title} → {decision}
+      </strong>
       <div>{reason}</div>
     </div>
   );
