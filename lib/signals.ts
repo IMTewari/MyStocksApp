@@ -1,12 +1,13 @@
 import { ema, rsi } from "./indicators";
 
 type Candles = { c: number }[];
+
 type Holding = {
   symbol: string;
   qty: number;
   avg: number;
   ltp: number;
-  candles: Candles; // ✅ candles are REQUIRED by contract
+  candles: Candles;
 };
 
 export type RedFlag = {
@@ -16,164 +17,148 @@ export type RedFlag = {
 };
 
 export type Tip = {
-  action: "buy" | "add" | "trim" | "hold" | "exit";
+  action: "add" | "trim" | "hold" | "exit";
   reason: string;
   confidence: "low" | "med" | "high";
 };
 
+/* ===============================
+   Professional thresholds
+   =============================== */
 const TH = {
   concentration: 0.25,
-  ddWarn: 0.20,
-  ddExit: 0.25,
-  rsiOversold: 30,
-  rsiOverbought: 70,
-  rsiAddFloor: 40,
-  rsiAddCeil: 65,
-  pnlWarn: -0.30,
-  pnlExit: -0.60,
+  rsiLow: 35,
+  rsiHigh: 65,
+  drawdownWarn: 0.20,
+  drawdownExit: 0.30,
+  pnlExit: -0.50
 };
 
 /* ===============================
    Helpers
    =============================== */
-function computeDrawdown(ltp: number, candles: Candles): number {
-  const closes = candles.map(x => x.c).filter(c => Number.isFinite(c) && c > 0);
-  if (closes.length === 0) return 0;
-
+function computeDrawdown(closes: number[], price: number): number {
   const window = closes.slice(-250);
-  const recentHigh = Math.max(...window);
-  const price = Number.isFinite(ltp) && ltp > 0 ? ltp : window[window.length - 1];
+  if (!window.length) return 0;
 
-  if (!Number.isFinite(recentHigh) || recentHigh <= 0) return 0;
+  const high = Math.max(...window);
+  if (high <= 0) return 0;
 
-  const dd = 1 - price / recentHigh;
-  return Math.max(0, Math.min(dd, 0.99));
+  return Math.max(0, Math.min(1 - price / high, 1));
 }
 
 /* ===============================
-   Signal Engine (Contract‑Based)
+   Professional Signal Engine
    =============================== */
 export function computeSignals(holdings: Holding[]) {
-  const total = holdings.reduce((s, h) => s + h.qty * h.ltp, 0);
+  const totalValue = holdings.reduce((s, h) => s + h.qty * h.ltp, 0);
 
   const flags: Record<string, RedFlag[]> = {};
   const tips: Record<string, Tip> = {};
 
   for (const h of holdings) {
-    const alloc = total ? (h.qty * h.ltp) / total : 0;
+    const alloc = totalValue ? (h.qty * h.ltp) / totalValue : 0;
     const pnlPct = h.avg > 0 ? (h.ltp - h.avg) / h.avg : 0;
 
     const list: RedFlag[] = [];
 
-    // Concentration risk
+    /* ======== Concentration ======== */
     if (alloc > TH.concentration) {
       list.push({
         type: "concentration",
-        message: `>25% allocation (${Math.round(alloc * 100)}%)`,
+        message: `High allocation (${Math.round(alloc * 100)}%)`,
         severity: "risk",
       });
     }
 
-    const closes = h.candles.map(x => x.c).filter(c => Number.isFinite(c));
-    let drawdown = 0;
-    let e5 = 0;
-    let e20 = 0;
-    let lastRsi = 50;
+    const closes = h.candles.map(x => x.c).filter(Number.isFinite);
 
-    if (closes.length > 50) {
-      drawdown = computeDrawdown(h.ltp, h.candles);
-      e5 = ema(closes, 5).at(-1)!;
-      e20 = ema(closes, 20).at(-1)!;
-      lastRsi = rsi(closes, 14).at(-1)!;
+    const ema20 = ema(closes, 20).at(-1)!;
+    const ema50 = ema(closes, 50).at(-1)!;
+    const ema200 = ema(closes, 200).at(-1)!;
+    const lastRsi = rsi(closes, 14).at(-1)!;
+    const drawdown = computeDrawdown(closes, h.ltp);
 
-      if (drawdown > TH.ddWarn) {
-        list.push({
-          type: "52w_drawdown",
-          message: `Down ${Math.round(drawdown * 100)}% from recent high`,
-          severity: drawdown > 0.35 ? "risk" : "warn",
-        });
-      }
+    /* ===============================
+       PRIMARY TREND CLASSIFICATION
+       (never optional)
+       =============================== */
+    let regime: "uptrend" | "downtrend" | "range";
 
-      if (e5 < e20) {
-        list.push({
-          type: "momentum_break",
-          message: "5EMA below 20EMA",
-          severity: "warn",
-        });
-      }
+    if (h.ltp > ema200 && ema50 > ema200) regime = "uptrend";
+    else if (h.ltp < ema200 && ema50 < ema200) regime = "downtrend";
+    else regime = "range";
 
-      if (lastRsi < TH.rsiOversold) {
-        list.push({
-          type: "oversold",
-          message: `RSI ${lastRsi.toFixed(1)}`,
-          severity: "info",
-        });
-      }
-
-      if (lastRsi > TH.rsiOverbought) {
-        list.push({
-          type: "overbought",
-          message: `RSI ${lastRsi.toFixed(1)}`,
-          severity: "info",
-        });
-      }
+    /* ===============================
+       Risk flags
+       =============================== */
+    if (drawdown > TH.drawdownWarn) {
+      list.push({
+        type: "drawdown",
+        message: `Down ${Math.round(drawdown * 100)}% from peak`,
+        severity: drawdown > TH.drawdownExit ? "risk" : "warn",
+      });
     }
 
-    // P&L based alerts (always valid)
-    if (pnlPct <= TH.pnlExit) {
+    if (lastRsi < TH.rsiLow) {
       list.push({
-        type: "deep_loss",
-        message: `Unrealized loss ${Math.round(pnlPct * -100)}%`,
-        severity: "risk",
+        type: "oversold",
+        message: `RSI ${lastRsi.toFixed(1)}`,
+        severity: "info",
       });
-    } else if (pnlPct <= TH.pnlWarn) {
+    }
+
+    if (lastRsi > TH.rsiHigh) {
       list.push({
-        type: "large_loss",
-        message: `Unrealized loss ${Math.round(pnlPct * -100)}%`,
-        severity: "warn",
+        type: "overbought",
+        message: `RSI ${lastRsi.toFixed(1)}`,
+        severity: "info",
       });
     }
 
     /* ===============================
-       Decision Logic (No Guessing)
+       ACTION DECISION
        =============================== */
     let action: Tip["action"] = "hold";
-    let reason = "Trend unclear; monitoring";
     let confidence: Tip["confidence"] = "low";
+    let reason = "";
 
-    if (e5 && e20) {
-      if (e5 > e20 && drawdown < TH.ddWarn && lastRsi > TH.rsiAddFloor && lastRsi < TH.rsiAddCeil) {
+    /* --- Capital protection first --- */
+    if (pnlPct <= TH.pnlExit || (regime === "downtrend" && drawdown > TH.drawdownExit)) {
+      action = "exit";
+      reason = "Downtrend confirmed; capital protection";
+      confidence = "high";
+    }
+
+    /* --- Uptrend logic --- */
+    else if (regime === "uptrend") {
+      if (ema20 > ema50 && lastRsi >= 45 && lastRsi <= 60 && drawdown < TH.drawdownWarn) {
         action = "add";
-        reason = "Uptrend intact with healthy momentum";
+        reason = "Primary uptrend intact with healthy momentum";
         confidence = "med";
-      }
-
-      if (e5 < e20 && lastRsi > TH.rsiOverbought - 5) {
-        action = "trim";
-        reason = "Momentum weakening after extended move";
-        confidence = "med";
-      }
-
-      if (e5 < e20 && drawdown > TH.ddExit) {
-        action = "exit";
-        reason = "Primary trend broken with deep drawdown";
-        confidence = "high";
+      } else {
+        action = "hold";
+        reason = "Uptrend intact; momentum neutral";
+        confidence = "low";
       }
     }
 
-    // Capital protection overrides
-    if (pnlPct <= TH.pnlExit) {
-      action = "exit";
-      reason = "Very deep loss; capital protection";
-      confidence = "high";
-    } else if (pnlPct <= TH.pnlWarn && action === "hold") {
-      action = "trim";
-      reason = "Large loss; risk reduction";
-      confidence = "med";
+    /* --- Range bound --- */
+    else if (regime === "range") {
+      action = "hold";
+      reason = "Range‑bound; no directional edge";
+      confidence = "low";
+    }
+
+    /* --- Downtrend but not panic --- */
+    else {
+      action = "hold";
+      reason = "Downtrend; avoid adding, monitor for stabilization";
+      confidence = "low";
     }
 
     flags[h.symbol] = list;
-    tips[h.symbol] = { action, reason, confidence };
+    tips[h.symbol] = { action, confidence, reason };
   }
 
   return { flags, tips };
