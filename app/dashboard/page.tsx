@@ -56,32 +56,26 @@ export default function Dashboard() {
   }, []);
 
   /* ===============================
-     Stable instrument key
+     Stable instrument list
      =============================== */
-  const instrumentKey = useMemo(
+  const instruments = useMemo(
     () =>
       rows
         .map((r) => `${r.exchange}:${r.tradingsymbol}`)
-        .sort()
-        .join("|"),
-    [rows.map((r) => r.tradingsymbol).join("|")]
+        .sort(),
+    [rows]
   );
 
   /* ===============================
      LTP polling (prices only)
      =============================== */
   useEffect(() => {
-    if (!rows.length) return;
+    if (!instruments.length) return;
 
     const tick = async () => {
       try {
-        const params = rows
-          .map(
-            (r) =>
-              `i=${encodeURIComponent(
-                `${r.exchange}:${r.tradingsymbol}`
-              )}`
-          )
+        const params = instruments
+          .map((i) => `i=${encodeURIComponent(i)}`)
           .join("&");
 
         const ltp = await fetch(`/api/kite/ltp?${params}`).then((r) =>
@@ -99,27 +93,18 @@ export default function Dashboard() {
           })
         );
       } catch {
-        // silent — price polling failure is non-fatal
+        // silent
       }
     };
 
     tick();
     const id = setInterval(tick, 5000);
     return () => clearInterval(id);
-  }, [instrumentKey]);
+  }, [instruments]);
 
   /* ===============================
      Signal computation (guarded)
      =============================== */
-  const signalKey = useMemo(
-    () =>
-      rows
-        .map((r) => r.tradingsymbol)
-        .sort()
-        .join("|"),
-    [rows.map((r) => r.tradingsymbol).join("|")]
-  );
-
   useEffect(() => {
     (async () => {
       if (!rows.length) return;
@@ -134,7 +119,6 @@ export default function Dashboard() {
 
           const cd = await fetch(url).then((res) => res.json());
 
-          // 🔒 HARD DATA CONTRACT (NO PARTIAL DATA PASSES)
           const safeCandles = enforceDataContract(
             r.tradingsymbol,
             cd.candles || []
@@ -147,11 +131,6 @@ export default function Dashboard() {
             ltp: r.last_price,
             candles: safeCandles,
           });
-          console.log(
-  "Fetched candles:",
-  r.tradingsymbol,
-  cd.candles?.length
-);
         } catch (err) {
           console.error(
             "Skipping symbol due to data error:",
@@ -165,7 +144,7 @@ export default function Dashboard() {
       setTips(s.tips);
       setFlags(s.flags);
     })();
-  }, [signalKey]);
+  }, [rows.map((r) => r.tradingsymbol).join("|")]);
 
   /* ===============================
      Derived values
@@ -179,20 +158,9 @@ export default function Dashboard() {
     [rows]
   );
 
-  const total = valuation;
-
-  /* ===============================
-     Render
-     =============================== */
   return (
     <main>
-      <h1
-        style={{
-          fontSize: 24,
-          fontWeight: 600,
-          marginBottom: 8,
-        }}
-      >
+      <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>
         Portfolio Coach
       </h1>
 
@@ -207,95 +175,6 @@ export default function Dashboard() {
           {error}
         </div>
       )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {rows.map((r) => {
-          const pnl =
-            (r.last_price - r.average_price) * r.quantity;
-          const value = r.last_price * r.quantity;
-          const allocPct = total
-            ? Math.round((value / total) * 100)
-            : 0;
-
-          const f = flags[r.tradingsymbol] || [];
-          const t = tips[r.tradingsymbol];
-
-          return (
-            <div
-              key={r.tradingsymbol}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: 8,
-                padding: 12,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600 }}>
-                    {r.tradingsymbol}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#666" }}>
-                    Qty {r.quantity} · Avg ₹{r.average_price} ·
-                    Alloc {allocPct}%
-                  </div>
-                </div>
-
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 600 }}>
-                    LTP ₹{r.last_price.toFixed(2)}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: pnl >= 0 ? "green" : "crimson",
-                    }}
-                  >
-                    P&amp;L ₹{pnl.toFixed(2)}
-                  </div>
-                </div>
-              </div>
-
-              {f.length > 0 && (
-                <ul
-                  style={{
-                    marginTop: 6,
-                    paddingLeft: 16,
-                    fontSize: 12,
-                  }}
-                >
-                  {f.map((x: any, i: number) => (
-                    <li
-                      key={i}
-                      style={{
-                        color:
-                          x.severity === "risk"
-                            ? "crimson"
-                            : x.severity === "warn"
-                            ? "#b45309"
-                            : "#555",
-                      }}
-                    >
-                      • {x.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {t && (
-                <div style={{ marginTop: 6, fontSize: 14 }}>
-                  <b>Coach:</b> {t.action.toUpperCase()} —{" "}
-                  {t.reason} ({t.confidence})
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </main>
   );
 }
