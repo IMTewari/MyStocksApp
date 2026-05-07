@@ -9,7 +9,7 @@ export type Candle = {
   volume: number;
 };
 
-const MIN_CANDLES = 600; // ≈ 2.5 years trading data
+const MIN_CANDLES = 200; // enough for 200-DMA & RSI
 
 export function enforceDataContract(
   symbol: string,
