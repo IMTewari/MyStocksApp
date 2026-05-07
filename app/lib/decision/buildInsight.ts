@@ -1,33 +1,26 @@
 import { aggregateDecision } from "./decisionEngine";
-import { technicalLens } from "./technicalLens";
+import { technicalLens, Evidence } from "./technicalLens";
 import { fundamentalLens } from "./fundamentalLens";
 import { marketLens } from "./marketLens";
-import { generateAICommentary } from "./aiCommentary";
 
-/**
- * Builds one ScriptInsight per symbol.
- * This file must contain ONLY imports + functions.
- */
 export async function buildInsight(
   symbol: string,
   data: {
     technical: {
-      below200dma: boolean;
-      momentumUp: boolean;
+      below200dma: Evidence<boolean>;
+      momentumUp: Evidence<boolean>;
     };
     fundamental: {
-      pe: number;
-      pe5yMedian: number;
-      promoterHolding: number;
-      promoterHolding3mAgo: number;
+      pe: Evidence<number>;
+      pe5yMedian: Evidence<number>;
+      promoterHolding: Evidence<number>;
+      promoterHolding3mAgo: Evidence<number>;
     };
     market: {
-      recentDrawdownPct: number;
-      liquidityReturning: boolean;
-      macroRiskHigh: boolean;
+      recentDrawdownPct: Evidence<number>;
+      liquidityReturning: Evidence<boolean>;
+      macroRiskHigh: Evidence<boolean>;
     };
-    sector: string;
-    context: string;
   }
 ) {
   const technical = technicalLens(data.technical);
@@ -45,11 +38,8 @@ export async function buildInsight(
     technical,
     fundamental,
     market,
-    aiCommentary: generateAICommentary({
-      symbol,
-      sector: data.sector,
-      context: data.context,
-    }),
+    aiCommentary:
+      "Decision reflects available evidence only; no assumptions made.",
     finalAction: final.action,
     finalConfidence: final.confidence,
     finalRationale: final.rationale,
