@@ -2,7 +2,7 @@ import { aggregateDecision } from "./decisionEngine";
 import { technicalLens } from "./technicalLens";
 import { fundamentalLens } from "./fundamentalLens";
 import { marketLens } from "./marketLens";
-import {import { generateAICommentary } from "./aiCommentary";
+import { generateAICommentary } from "./aiCommentary";
     symbol,
     technical,
     fundamental,
