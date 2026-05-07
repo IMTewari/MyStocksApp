@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect from "react";
+import { useEffect, useMemo, useState } from "react";
 import { computeSignals } from "@/lib/signals";
 import { CoachSummary } from "./Coach";
 
@@ -22,9 +22,9 @@ export default function Dashboard() {
   const [rows, setRows] = useState<HoldingRow[]>([]);
   const [tips, setTips] = useState<Record<string, any>>({});
   const [flags, setFlags] = useState<Record<string, any>>({});
-  const [candlesBySymbol, setCandlesBySymbol] = useState<Record<string, Candle[]>>(
-    {}
-  );
+  const [candlesBySymbol, setCandlesBySymbol] = useState<
+    Record<string, Candle[]>
+  >({});
   const [insights, setInsights] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,7 +103,7 @@ export default function Dashboard() {
   }, [rows]);
 
   /* ===============================
-     Fetch OHLC candles (raw facts)
+     Fetch OHLC candles
      =============================== */
   useEffect(() => {
     if (!rows.length) return;
@@ -131,32 +131,26 @@ export default function Dashboard() {
   }, [rows]);
 
   /* ===============================
-     Existing coach signals (unchanged)
+     Existing coach signals
      =============================== */
   useEffect(() => {
-    (async () => {
-      if (!rows.length) return;
+    if (!rows.length) return;
 
-      const enriched: any[] = [];
+    const enriched = rows.map(r => ({
+      symbol: r.tradingsymbol,
+      qty: r.quantity,
+      avg: r.average_price,
+      ltp: r.last_price,
+      candles: candlesBySymbol[r.tradingsymbol] || [],
+    }));
 
-      for (const r of rows) {
-        enriched.push({
-          symbol: r.tradingsymbol,
-          qty: r.quantity,
-          avg: r.average_price,
-          ltp: r.last_price,
-          candles: candlesBySymbol[r.tradingsymbol] || [],
-        });
-      }
-
-      const s = computeSignals(enriched);
-      setTips(s.tips);
-      setFlags(s.flags);
-    })();
+    const s = computeSignals(enriched);
+    setTips(s.tips);
+    setFlags(s.flags);
   }, [rows, candlesBySymbol]);
 
   /* ===============================
-     Build Insights (CANONICAL FACTS)
+     Build Insights (canonical facts)
      =============================== */
   useEffect(() => {
     if (!rows.length) return;
@@ -171,7 +165,6 @@ export default function Dashboard() {
         const insight = await buildInsight(r.tradingsymbol, {
           candles: closePrices,
 
-          // Fundamentals intentionally UNKNOWN unless wired
           fundamental: {
             pe: { status: "UNKNOWN", reason: "PE not wired" },
             pe5yMedian: {
@@ -188,7 +181,6 @@ export default function Dashboard() {
             },
           },
 
-          // Market context intentionally UNKNOWN unless wired
           market: {
             recentDrawdownPct: {
               status: "UNKNOWN",
@@ -259,4 +251,3 @@ export default function Dashboard() {
     </main>
   );
 }
-``
