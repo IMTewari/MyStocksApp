@@ -1,3 +1,4 @@
+import { enforceDataContract } from "@/app/lib/portfolio/dataGuard";
 
 "use client";
 import { useEffect, useMemo, useState } from "react";
@@ -63,23 +64,47 @@ export default function Dashboard() {
   }, [rows]);
 
   // Compute signals using FREE OHLC endpoint
-  useEffect(() => {
-    (async () => {
-      if (rows.length === 0) return;
-      const enriched: any[] = [];
-      for (const r of rows) {
-        try {
-          const url = `/api/data/ohlc?symbol=${encodeURIComponent(r.tradingsymbol)}&exchange=${encodeURIComponent(r.exchange)}&days=365`;
-          const cd = await fetch(url).then(res => res.json());
-          enriched.push({ symbol: r.tradingsymbol, qty: r.quantity, avg: r.average_price, ltp: r.last_price, candles: cd.candles || [] });
-        } catch {
-          enriched.push({ symbol: r.tradingsymbol, qty: r.quantity, avg: r.average_price, ltp: r.last_price, candles: [] });
-        }
+
+useEffect(() => {
+  (async () => {
+    if (rows.length === 0) return;
+
+    const enriched: any[] = [];
+
+    for (const r of rows) {
+      try {
+        const url = `/api/data/ohlc?symbol=${encodeURIComponent(
+          r.tradingsymbol
+        )}&exchange=${encodeURIComponent(r.exchange)}&days=900`;
+
+        const cd = await fetch(url).then(res => res.json());
+
+        // 🔒 HARD DATA CONTRACT — GUARANTEED HISTORY
+        const safeCandles = enforceDataContract(
+          r.tradingsymbol,
+          cd.candles || []
+        );
+
+        enriched.push({
+          symbol: r.tradingsymbol,
+          qty: r.quantity,
+          avg: r.average_price,
+          ltp: r.last_price,
+          candles: safeCandles,
+        });
+
+      } catch (err) {
+        console.error("Skipping symbol due to data error:", r.tradingsymbol, err);
+        // ✅ Skip bad symbol — do NOT guess
       }
-      const s = computeSignals(enriched);
-      setTips(s.tips); setFlags(s.flags);
-    })();
-  }, [rows]);
+    }
+
+    const s = computeSignals(enriched);
+    setTips(s.tips);
+    setFlags(s.flags);
+  })();
+}, [rows]);
+
 
   const valuation = useMemo(() => rows.reduce((acc, r) => acc + r.last_price * r.quantity, 0), [rows]);
   const total = valuation;
