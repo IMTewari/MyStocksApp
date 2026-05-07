@@ -127,6 +127,11 @@ export default function Dashboard() {
       const enriched: any[] = [];
 
       for (const r of rows) {
+        console.log(
+  "Fetched candles:",
+  r.tradingsymbol,
+  cd.candles?.length
+);
         try {
           const url = `/api/data/ohlc?symbol=${encodeURIComponent(
             r.tradingsymbol
