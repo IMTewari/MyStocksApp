@@ -29,8 +29,10 @@ export default function Dashboard() {
         const res = await fetch("/api/kite/portfolio");
         const p = await res.json();
 
-        if (p?.error) {
-          setError("Not authenticated. Login from home page.");
+        if (p.error) {
+          setError(
+            "Not authenticated. Click 'Login with Zerodha' on home page."
+          );
           return;
         }
 
@@ -47,17 +49,20 @@ export default function Dashboard() {
 
         setRows(list);
         setError(null);
-      } catch (e) {
-        setError("Failed to load portfolio.");
+      } catch (e: any) {
+        setError(e?.message || "Failed to load portfolio");
       }
     })();
   }, []);
 
   /* ===============================
-     Instruments (stable)
+     Stable instrument list
      =============================== */
   const instruments = useMemo(
-    () => rows.map(r => `${r.exchange}:${r.tradingsymbol}`),
+    () =>
+      rows
+        .map((r) => `${r.exchange}:${r.tradingsymbol}`)
+        .sort(),
     [rows]
   );
 
@@ -70,13 +75,15 @@ export default function Dashboard() {
     const tick = async () => {
       try {
         const params = instruments
-          .map(i => `i=${encodeURIComponent(i)}`)
+          .map((i) => `i=${encodeURIComponent(i)}`)
           .join("&");
 
-        const ltp = await fetch(`/api/kite/ltp?${params}`).then(r => r.json());
+        const ltp = await fetch(`/api/kite/ltp?${params}`).then((r) =>
+          r.json()
+        );
 
-        setRows(prev =>
-          prev.map(r => {
+        setRows((prev) =>
+          prev.map((r) => {
             const key = `${r.exchange}:${r.tradingsymbol}`;
             const px = ltp[key]?.last_price;
             return {
@@ -85,8 +92,8 @@ export default function Dashboard() {
             };
           })
         );
-      } catch (e) {
-        console.error("LTP polling failed", e);
+      } catch {
+        // silent
       }
     };
 
@@ -99,9 +106,9 @@ export default function Dashboard() {
      Signal computation (guarded)
      =============================== */
   useEffect(() => {
-    if (!rows.length) return;
-
     (async () => {
+      if (!rows.length) return;
+
       const enriched: any[] = [];
 
       for (const r of rows) {
@@ -110,10 +117,8 @@ export default function Dashboard() {
             r.tradingsymbol
           )}&exchange=${encodeURIComponent(r.exchange)}&days=900`;
 
-          const res = await fetch(url);
-          const cd = await res.json();
+          const cd = await fetch(url).then((res) => res.json());
 
-          // HARD DATA CONTRACT
           const safeCandles = enforceDataContract(
             r.tradingsymbol,
             cd.candles || []
@@ -126,49 +131,50 @@ export default function Dashboard() {
             ltp: r.last_price,
             candles: safeCandles,
           });
-        } catch (e) {
+        } catch (err) {
           console.error(
-            "Skipping symbol due to data issue:",
+            "Skipping symbol due to data error:",
             r.tradingsymbol,
-            e
+            err
           );
         }
       }
 
       const s = computeSignals(enriched);
-      setTips(s.tips || {});
-      setFlags(s.flags || {});
+      setTips(s.tips);
+      setFlags(s.flags);
     })();
-  }, [rows.map(r => r.tradingsymbol).join("|")]);
+  }, [rows.map((r) => r.tradingsymbol).join("|")]);
 
   /* ===============================
      Derived values
      =============================== */
   const valuation = useMemo(
-    () => rows.reduce((a, r) => a + r.last_price * r.quantity, 0),
+    () =>
+      rows.reduce(
+        (acc, r) => acc + r.last_price * r.quantity,
+        0
+      ),
     [rows]
   );
 
-  /* ===============================
-     Render
-     =============================== */
   return (
-    <main style={{ padding: 16 }}>
+    <main>
       <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>
         Portfolio Coach
       </h1>
-
-      {error && (
-        <div style={{ color: "crimson", marginBottom: 12 }}>
-          {error}
-        </div>
-      )}
 
       <CoachSummary rows={rows} flags={flags} tips={tips} />
 
       <div style={{ marginBottom: 16, color: "#666" }}>
         Valuation: ₹{Math.round(valuation).toLocaleString()}
       </div>
+
+      {error && (
+        <div style={{ color: "crimson", marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
     </main>
   );
 }
