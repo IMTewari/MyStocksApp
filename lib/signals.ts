@@ -1,4 +1,4 @@
-import { ema, rsi } from "./indicators";
+import";
 
 type Candles = { c: number }[];
 
@@ -7,7 +7,7 @@ type Holding = {
   qty: number;
   avg: number;
   ltp: number;
-  candles: Candles;
+  candles: Candles; // candles guaranteed by data contract
 };
 
 export type RedFlag = {
@@ -31,7 +31,7 @@ const TH = {
   rsiHigh: 65,
   drawdownWarn: 0.20,
   drawdownExit: 0.30,
-  pnlExit: -0.50
+  pnlExit: -0.50,
 };
 
 /* ===============================
@@ -62,7 +62,9 @@ export function computeSignals(holdings: Holding[]) {
 
     const list: RedFlag[] = [];
 
-    /* ======== Concentration ======== */
+    /* ===============================
+       Concentration risk
+       =============================== */
     if (alloc > TH.concentration) {
       list.push({
         type: "concentration",
@@ -81,21 +83,25 @@ export function computeSignals(holdings: Holding[]) {
 
     /* ===============================
        PRIMARY TREND CLASSIFICATION
-       (never optional)
+       (mandatory, non-ambiguous)
        =============================== */
     let regime: "uptrend" | "downtrend" | "range";
 
-    if (h.ltp > ema200 && ema50 > ema200) regime = "uptrend";
-    else if (h.ltp < ema200 && ema50 < ema200) regime = "downtrend";
-    else regime = "range";
+    if (h.ltp > ema200 && ema50 > ema200) {
+      regime = "uptrend";
+    } else if (h.ltp < ema200 && ema50 < ema200) {
+      regime = "downtrend";
+    } else {
+      regime = "range";
+    }
 
     /* ===============================
-       Risk flags
+       Risk context flags
        =============================== */
     if (drawdown > TH.drawdownWarn) {
       list.push({
         type: "drawdown",
-        message: `Down ${Math.round(drawdown * 100)}% from peak`,
+        message: `Down ${Math.round(drawdown * 100)}% from recent high`,
         severity: drawdown > TH.drawdownExit ? "risk" : "warn",
       });
     }
@@ -123,42 +129,55 @@ export function computeSignals(holdings: Holding[]) {
     let confidence: Tip["confidence"] = "low";
     let reason = "";
 
-    /* --- Capital protection first --- */
-    if (pnlPct <= TH.pnlExit || (regime === "downtrend" && drawdown > TH.drawdownExit)) {
+    /* === CAPITAL PROTECTION (highest priority) === */
+    if (
+      pnlPct <= TH.pnlExit ||
+      (regime === "downtrend" && drawdown > TH.drawdownExit)
+    ) {
       action = "exit";
-      reason = "Downtrend confirmed; capital protection";
+      reason = "Below 200 DMA with sustained weakness; capital protection";
       confidence = "high";
     }
 
-    /* --- Uptrend logic --- */
+    /* === STRUCTURAL UPTREND === */
     else if (regime === "uptrend") {
-      if (ema20 > ema50 && lastRsi >= 45 && lastRsi <= 60 && drawdown < TH.drawdownWarn) {
+      if (ema20 > ema50 && lastRsi >= 45 && lastRsi <= 60) {
         action = "add";
-        reason = "Primary uptrend intact with healthy momentum";
+        reason = "Above 200 DMA with positive structure and supportive momentum";
         confidence = "med";
+      } else if (lastRsi < 45) {
+        action = "hold";
+        reason = "Above 200 DMA, but momentum weak; waiting for confirmation";
+        confidence = "low";
       } else {
         action = "hold";
-        reason = "Uptrend intact; momentum neutral";
+        reason = "Primary uptrend intact; no immediate risk‑reward advantage";
         confidence = "low";
       }
     }
 
-    /* --- Range bound --- */
+    /* === RANGE-BOUND REGIME === */
     else if (regime === "range") {
       action = "hold";
-      reason = "Range‑bound; no directional edge";
+      reason =
+        "Price oscillating between 20 and 50 DMA; trend not established";
       confidence = "low";
     }
 
-    /* --- Downtrend but not panic --- */
+    /* === STRUCTURAL DOWNTREND (but no panic) === */
     else {
       action = "hold";
-      reason = "Downtrend; avoid adding, monitor for stabilization";
+      reason =
+        "Below 200 DMA; downtrend persists, avoiding additional exposure";
       confidence = "low";
     }
 
     flags[h.symbol] = list;
-    tips[h.symbol] = { action, confidence, reason };
+    tips[h.symbol] = {
+      action,
+      reason,
+      confidence,
+    };
   }
 
   return { flags, tips };
