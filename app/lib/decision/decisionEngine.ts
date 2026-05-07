@@ -1,7 +1,14 @@
+// app/lib/decision/decisionEngine.ts
+
+import { ContextualEvidence } from "./contextualEvidence";
+
+/**
+ * Lens-level decisions (pure signal outputs)
+ */
 export type LensDecision = "BUY" | "HOLD" | "SELL";
 
 /**
- NOT NARROW)
+ * Final portfolio action (DO NOT NARROW)
  */
 export type FinalAction =
   | "BUY"
@@ -10,12 +17,18 @@ export type FinalAction =
   | "EXIT"
   | "AVOID";
 
+/**
+ * Standard output from any analytical lens
+ */
 export interface LensOutcome {
   decision: LensDecision;
   reason: string;
   confidence: number; // 0–100
 }
 
+/**
+ * Output shown per script in UI
+ */
 export interface ScriptInsight {
   symbol: string;
 
@@ -23,41 +36,65 @@ export interface ScriptInsight {
   fundamental: LensOutcome;
   market: LensOutcome;
 
+  /**
+   * External, fact-based context
+   * (geopolitics, macro, commodities, policy)
+   */
+  contextualEvidence: ContextualEvidence[];
+
+  /**
+   * AI narrative explanation (NO decision power)
+   */
   aiCommentary: string;
 
+  /**
+   * Aggregated portfolio action
+   */
   finalAction: FinalAction;
   finalConfidence: number;
   finalRationale: string;
 }
 
 /**
- * Portfolio-grade aggregation.
- * No assumptions. UNKNOWN depresses confidence.
+ * Aggregate multiple lenses into one portfolio decision.
+ *
+ * Rules:
+ * - No assumptions
+ * - Unknown / weak evidence penalizes confidence
+ * - EXIT reserved for strong negative alignment
+ * - AVOID used when information quality is too low
  */
 export function aggregateDecision(
-  t: LensOutcome,
-  f: LensOutcome,
-  m: LensOutcome
+  technical: LensOutcome,
+  fundamental: LensOutcome,
+  market: LensOutcome
 ): {
   action: FinalAction;
   confidence: number;
   rationale: string;
 } {
+  // Weighted confidence (fundamentals dominate by design)
   const baseConfidence =
-    t.confidence * 0.3 +
-    f.confidence * 0.5 +
-    m.confidence * 0.2;
+    technical.confidence * 0.3 +
+    fundamental.confidence * 0.5 +
+    market.confidence * 0.2;
 
-  const unknownPenalty =
-    [t, f, m].filter(x => x.confidence < 40).length * 15;
+  // Penalize uncertainty explicitly
+  const uncertaintyPenalty =
+    [technical, fundamental, market].filter(
+      o => o.confidence < 40
+    ).length * 15;
 
   const confidence = Math.max(
     0,
-    Math.round(baseConfidence - unknownPenalty)
+    Math.round(baseConfidence - uncertaintyPenalty)
   );
 
-  // Strong negative alignment → EXIT
-  if (t.decision === "SELL" && f.decision === "SELL") {
+  // Strong aligned downside → EXIT
+  if (
+    technical.decision === "SELL" &&
+    fundamental.decision === "SELL"
+  ) {
     return {
       action: "EXIT",
       confidence,
@@ -66,8 +103,8 @@ export function aggregateDecision(
     };
   }
 
-  // Structural negative → SELL
-  if (f.decision === "SELL") {
+  // Structural downside → SELL
+  if (fundamental.decision === "SELL") {
     return {
       action: "SELL",
       confidence,
@@ -76,27 +113,30 @@ export function aggregateDecision(
     };
   }
 
-  // Strong positive alignment → BUY
-  if (t.decision === "BUY" && f.decision === "BUY") {
+  // Strong aligned upside → BUY
+  if (
+    technical.decision === "BUY" &&
+    fundamental.decision === "BUY"
+  ) {
     return {
       action: "BUY",
       confidence,
       rationale:
-        "Positive technical structure aligned with supportive fundamentals",
+        "Technical strength aligned with supportive fundamentals",
     };
   }
 
-  // Evidence weak or incomplete → HOLD
+  // Moderate evidence → HOLD
   if (confidence >= 40) {
     return {
       action: "HOLD",
       confidence,
       rationale:
-        "Evidence insufficient for decisive action; monitoring",
+        "Evidence incomplete or conflicting; monitoring without action",
     };
   }
 
-  // High uncertainty → AVOID
+  // Low evidence quality → AVOID
   return {
     action: "AVOID",
     confidence,
