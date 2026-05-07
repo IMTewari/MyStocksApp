@@ -1,30 +1,44 @@
-import { LensDecision, LensOutcome } from "./decisionEngine";
+import { LensOutcome } from "./decisionEngine";
+
+export type Evidence<T> =
+  | { status: "KNOWN"; value: T }
+  | { status: "UNKNOWN"; reason: string };
 
 export interface TechnicalInput {
-  below200dma: boolean;
-  momentumUp: boolean;
+  below200dma: Evidence<boolean>;
+  momentumUp: Evidence<boolean>;
 }
 
-export function technicalLens(input: TechnicalInput): LensOutcome {
-  if (input.below200dma && !input.momentumUp) {
-    return {
-      decision: "SELL" as LensDecision,
-      reason: "Below 200 DMA with no positive momentum",
-      confidence: 75,
-    };
-  }
+export function technicalLens(
+  input: TechnicalInput
+): LensOutcome {
+  if (
+    input.below200dma.status === "KNOWN" &&
+    input.momentumUp.status === "KNOWN"
+  ) {
+    if (input.below200dma.value && !input.momentumUp.value) {
+      return {
+        decision: "SELL",
+        reason:
+          "Below long‑term trend with confirmed momentum breakdown",
+        confidence: 75,
+      };
+    }
 
-  if (!input.below200dma && input.momentumUp) {
-    return {
-      decision: "BUY" as LensDecision,
-      reason: "Above long-term trend with improving momentum",
-      confidence: 70,
-    };
+    if (!input.below200dma.value && input.momentumUp.value) {
+      return {
+        decision: "BUY",
+        reason:
+          "Above long‑term trend with confirmed positive momentum",
+        confidence: 70,
+      };
+    }
   }
 
   return {
-    decision: "HOLD" as LensDecision,
-    reason: "Trend intact but momentum inconclusive",
-    confidence: 45,
+    decision: "HOLD",
+    reason:
+      "Technical evidence incomplete or inconclusive",
+    confidence: 30,
   };
 }
