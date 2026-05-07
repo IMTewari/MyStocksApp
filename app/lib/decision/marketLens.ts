@@ -1,5 +1,7 @@
+// app/lib/decision/marketLens.ts
+
 import { LensOutcome } from "./decisionEngine";
-import { Evidence } from "./technicalLens";
+import { Evidence } from "./deriveTechnicalEvidence";
 
 export interface MarketInput {
   recentDrawdownPct: Evidence<number>;
@@ -7,9 +9,14 @@ export interface MarketInput {
   macroRiskHigh: Evidence<boolean>;
 }
 
+/**
+ * Market lens evaluates broad risk environment.
+ * It does NOT predict direction.
+ */
 export function marketLens(
   input: MarketInput
 ): LensOutcome {
+  // If macro context is unknown, stay conservative
   if (
     input.recentDrawdownPct.status !== "KNOWN" ||
     input.liquidityReturning.status !== "KNOWN" ||
@@ -17,38 +24,36 @@ export function marketLens(
   ) {
     return {
       decision: "HOLD",
-      reason:
-        "Market context unclear; refraining from regime call",
-      confidence: 30,
+      reason: "Market regime information incomplete",
+      confidence: 25,
     };
   }
 
-  if (
-    input.recentDrawdownPct.value > 12 &&
-    input.liquidityReturning.value &&
-    !input.macroRiskHigh.value
-  ) {
+  // Stress regime
+  if (input.macroRiskHigh.value) {
     return {
-      decision: "HOLD",
-      reason:
-        "Tactical recovery after drawdown; not a confirmed regime shift",
+      decision: "SELL",
+      reason: "Elevated macro risk environment",
       confidence: 55,
     };
   }
 
-  if (input.macroRiskHigh.value) {
+  // Liquidity recovery after drawdown
+  if (
+    input.recentDrawdownPct.value > 10 &&
+    input.liquidityReturning.value
+  ) {
     return {
       decision: "HOLD",
-      reason:
-        "Elevated macro risk; capital preservation prioritized",
+      reason: "Markets stabilizing after drawdown",
       confidence: 40,
     };
   }
 
+  // Neutral macro regime
   return {
     decision: "HOLD",
-    reason:
-      "No decisive macro impulse",
+    reason: "Neutral market environment",
     confidence: 35,
   };
 }
