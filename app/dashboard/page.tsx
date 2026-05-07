@@ -6,6 +6,7 @@ import { CoachSummary } from "./Coach";
 
 import ScriptDecisionCard from "@/app/components/ScriptDecisionCard";
 import { buildInsight } from "@/app/lib/decision/buildInsight";
+import { ContextualEvidence } from "@/app/lib/decision/contextualEvidence";
 
 type HoldingRow = {
   instrument_token: number;
@@ -22,14 +23,17 @@ export default function Dashboard() {
   const [rows, setRows] = useState<HoldingRow[]>([]);
   const [tips, setTips] = useState<Record<string, any>>({});
   const [flags, setFlags] = useState<Record<string, any>>({});
+  const [error, setError] = useState<string | null>(null);
+
   const [candlesBySymbol, setCandlesBySymbol] = useState<
     Record<string, Candle[]>
   >({});
+
+  const [indexCandles, setIndexCandles] = useState<number[]>([]);
   const [insights, setInsights] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
 
   /* ===============================
-     Load portfolio
+     Load Portfolio
      =============================== */
   useEffect(() => {
     (async () => {
@@ -63,47 +67,27 @@ export default function Dashboard() {
   }, []);
 
   /* ===============================
-     LTP polling
+     Fetch Index Candles (Benchmark)
      =============================== */
   useEffect(() => {
-    if (!rows.length) return;
-
-    const instruments = rows.map(
-      r => `${r.exchange}:${r.tradingsymbol}`
-    );
-
-    const tick = async () => {
+    (async () => {
       try {
-        const params = instruments
-          .map(i => `i=${encodeURIComponent(i)}`)
-          .join("&");
+        // Example: NIFTY 50
+        const url =
+          "/api/data/ohlc?symbol=NIFTY%2050&exchange=NSE&days=365";
+        const res = await fetch(url);
+        const data = await res.json();
 
-        const ltp = await fetch(`/api/kite/ltp?${params}`).then(r =>
-          r.json()
-        );
-
-        setRows(prev =>
-          prev.map(r => {
-            const key = `${r.exchange}:${r.tradingsymbol}`;
-            const px = ltp[key]?.last_price;
-            return {
-              ...r,
-              last_price: Number.isFinite(px)
-                ? Number(px)
-                : r.last_price,
-            };
-          })
-        );
-      } catch {}
-    };
-
-    tick();
-    const id = setInterval(tick, 5000);
-    return () => clearInterval(id);
-  }, [rows]);
+        const closes = (data.candles || []).map((c: any) => c.c);
+        setIndexCandles(closes);
+      } catch {
+        setIndexCandles([]);
+      }
+    })();
+  }, []);
 
   /* ===============================
-     Fetch OHLC candles
+     Fetch OHLC Candles for Holdings
      =============================== */
   useEffect(() => {
     if (!rows.length) return;
@@ -131,7 +115,7 @@ export default function Dashboard() {
   }, [rows]);
 
   /* ===============================
-     Existing coach signals
+     Existing Coach Logic (UNCHANGED)
      =============================== */
   useEffect(() => {
     if (!rows.length) return;
@@ -150,7 +134,7 @@ export default function Dashboard() {
   }, [rows, candlesBySymbol]);
 
   /* ===============================
-     Build Insights (canonical facts)
+     Build AI / Decision Insights
      =============================== */
   useEffect(() => {
     if (!rows.length) return;
@@ -160,10 +144,11 @@ export default function Dashboard() {
 
       for (const r of rows) {
         const rawCandles = candlesBySymbol[r.tradingsymbol] || [];
-        const closePrices = rawCandles.map(c => c.c);
+        const stockCloses = rawCandles.map(c => c.c);
 
         const insight = await buildInsight(r.tradingsymbol, {
-          candles: closePrices,
+          candles: stockCloses,
+          indexCandles,
 
           fundamental: {
             pe: { status: "UNKNOWN", reason: "PE not wired" },
@@ -196,7 +181,7 @@ export default function Dashboard() {
             },
           },
 
-          contextualEvidence: [],
+          contextualEvidence: [] as ContextualEvidence[],
         });
 
         out.push(insight);
@@ -204,7 +189,7 @@ export default function Dashboard() {
 
       setInsights(out);
     })();
-  }, [rows, candlesBySymbol]);
+  }, [rows, candlesBySymbol, indexCandles]);
 
   const valuation = useMemo(
     () =>
