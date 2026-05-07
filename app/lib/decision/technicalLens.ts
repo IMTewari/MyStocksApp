@@ -1,35 +1,18 @@
-// app/lib/decision/technicalLens.ts
-
-import { LensOutcome } from "./decisionEngine";
-import { Evidence } from "./deriveTechnicalEvidence";
-
-export interface TechnicalInput {
-  below200dma: Evidence<boolean>;
-  momentumUp: Evidence<boolean>;
-  rsiAbove50: Evidence<boolean>;
-  relativeStrength: Evidence<number>;
-}
-
-export function technicalLens(
-  input: TechnicalInput
-): LensOutcome {
-  // Relative strength is the differentiator
-  if (
-    input.relativeStrength.status === "KNOWN"
-  ) {
-    if (input.relativeStrength.value > 0.08) {
+export function technicalLens(input: TechnicalInput): LensOutcome {
+  if (input.relativeStrength.status === "KNOWN") {
+    if (input.relativeStrength.value > 0.05) {
       return {
         decision: "BUY",
-        reason: "Consistent outperformance vs index",
-        confidence: 65,
+        reason: "Sustained outperformance vs index",
+        confidence: 60,
       };
     }
 
-    if (input.relativeStrength.value < -0.08) {
+    if (input.relativeStrength.value < -0.05) {
       return {
         decision: "SELL",
         reason: "Persistent underperformance vs index",
-        confidence: 65,
+        confidence: 60,
       };
     }
   }
@@ -48,7 +31,7 @@ export function technicalLens(
 
   return {
     decision: "HOLD",
-    reason: "No relative edge detected",
+    reason: "No decisive edge vs market",
     confidence: 45,
   };
 }
