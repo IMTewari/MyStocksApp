@@ -1,27 +1,37 @@
-export function fundamentalLens(input: {
+export interface FundamentalInput {
   pe: number;
-  peBand: "HIGH" | "FAIR" | "LOW";
-  promoterTrend: "UP" | "FLAT" | "DOWN";
-}) {
-  if (input.peBand === "HIGH" && input.promoterTrend === "DOWN") {
+  pe5yMedian: number;
+  promoterHolding: number;
+  promoterHolding3mAgo: number;
+}
+
+export function fundamentalLens(input: FundamentalInput) {
+  const peExpensive = input.pe > input.pe5yMedian * 1.15;
+  const promoterReducing =
+    input.promoterHolding < input.promoterHolding3mAgo;
+
+  if (peExpensive && promoterReducing) {
     return {
-      decision: "SELL",
+      decision: "SELL" as const,
       reason:
-        "Valuation stretched with declining promoter confidence",
+        "Valuation stretched versus history and promoter holding declining",
+      confidence: 80,
     };
   }
 
-  if (input.peBand === "LOW" && input.promoterTrend !== "DOWN") {
+  if (!peExpensive && !promoterReducing) {
     return {
-      decision: "BUY",
+      decision: "BUY" as const,
       reason:
-        "Valuation attractive with stable promoter ownership",
+        "Valuation reasonable with stable promoter ownership",
+      confidence: 70,
     };
   }
 
   return {
-    decision: "HOLD",
-    reason: "Fundamentals stable but not compelling",
+    decision: "HOLD" as const,
+    reason:
+      "Fundamentals stable but not strong enough for action",
+    confidence: 50,
   };
 }
-``
