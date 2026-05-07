@@ -5,7 +5,6 @@ import { computeSignals } from "@/lib/signals";
 import { CoachSummary } from "./Coach";
 
 import ScriptDecisionCard from "@/app/components/ScriptDecisionCard";
-import { mockInsights } from "@/app/lib/decision/mockInsights";
 import { buildInsight } from "@/app/lib/decision/buildInsight";
 
 ``
