@@ -1,7 +1,11 @@
-// app/lib/decision/decisionEngine.ts
+.ts
 
 import { BusinessArchetype } from "./businessArchetype";
 import { ContextualEvidence } from "./contextualEvidence";
+
+/* ===============================
+   Types
+   =============================== */
 
 export type LensDecision = "BUY" | "HOLD" | "SELL";
 
@@ -34,8 +38,15 @@ export interface ScriptInsight {
   finalRationale: string;
 }
 
+/* ===============================
+   Decision Aggregation (UPDATED)
+   =============================== */
+
 /**
- * Aggregate decisions WITH semantic awareness.
+ * Decision policy:
+ * - Strongest available signal determines direction
+ * - Missing / weak signals reduce confidence but DO NOT veto
+ * - Avoid only when overall conviction is truly low
  */
 export function aggregateDecision(
   technical: LensOutcome,
@@ -47,46 +58,50 @@ export function aggregateDecision(
   confidence: number;
   rationale: string;
 } {
-  // Base weighted confidence
-  const base =
-    technical.confidence * 0.4 +
-    fundamental.confidence * 0.4 +
-    market.confidence * 0.2;
+  // 1️⃣ Collect lenses that actually have signal
+  const lenses = [technical, fundamental, market].filter(
+    l => l.confidence > 0
+  );
 
-  // Penalize uncertainty
-  const uncertaintyPenalty =
-    [technical, fundamental, market].filter(x => x.confidence < 40).length * 15;
-
-  const confidence = Math.max(0, Math.round(base - uncertaintyPenalty));
-
-  // Structural EXIT
-  if (technical.decision === "SELL" && fundamental.decision === "SELL") {
+  // Safety fallback (should never happen)
+  if (!lenses.length) {
     return {
-      action: "EXIT",
-      confidence,
-      rationale:
-        "Technical and fundamental weakness align for this business type",
+      action: "AVOID",
+      confidence: 0,
+      rationale: "No usable signals available",
     };
   }
 
-  // Archetype‑aware BUY gating
-  if (
-    technical.decision === "BUY" &&
-    fundamental.decision === "BUY"
-  ) {
-    return {
-      action: "BUY",
-      confidence,
-      rationale:
-        `Positive structure aligns for ${archetype} business`,
-    };
+  // 2️⃣ Pick strongest signal
+  const primary = lenses.sort(
+    (a, b) => b.confidence - a.confidence
+  )[0];
+
+  // 3️⃣ Base confidence from strongest signal
+  let confidence = primary.confidence;
+
+  // 4️⃣ Discount for weak / missing confirmation
+  const weakCount = [technical, fundamental, market].filter(
+    l => l.confidence < 30
+  ).length;
+
+  confidence = Math.max(confidence - weakCount * 10, 10);
+
+  // 5️⃣ Decide final action
+  let action: FinalAction = "HOLD";
+
+  if (primary.decision === "BUY" && confidence >= 40) {
+    action = "BUY";
+  } else if (primary.decision === "SELL" && confidence >= 40) {
+    action = "SELL";
+  } else if (confidence < 20) {
+    action = "AVOID";
   }
 
-  // Default HOLD with semantics
   return {
-    action: confidence > 30 ? "HOLD" : "AVOID",
+    action,
     confidence,
     rationale:
-      `Insufficient confirmation for ${archetype} risk profile`,
+      `Decision driven by strongest signal (${primary.reason}); other signals discounted for ${archetype} profile`,
   };
 }
