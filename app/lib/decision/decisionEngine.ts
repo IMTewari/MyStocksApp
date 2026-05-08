@@ -1,5 +1,3 @@
-.ts
-
 import { BusinessArchetype } from "./businessArchetype";
 import { ContextualEvidence } from "./contextualEvidence";
 
